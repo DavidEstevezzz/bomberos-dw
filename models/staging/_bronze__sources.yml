@@ -1,0 +1,176 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: >
+      Datos brutos del sistema OLTP de gestión de Bomberos de Granada.
+      14 tablas extraídas desde MariaDB con PII enmascarado.
+    database: BOMBEROS_DW
+    schema: BRONZE
+    config:
+      freshness:
+        warn_after: {count: 30, period: day}
+        error_after: {count: 60, period: day}
+      loaded_at_field: _LOADED_AT
+    quoting:
+      database: false
+      schema: false
+      identifier: false
+    tables:
+      - name: users
+        description: "Bomberos y mandos del cuerpo. Nombre tokenizado (BOMBERO_XXX)."
+        columns:
+          - name: ID_EMPLEADO
+            description: "Identificador único del bombero."
+            data_tests:
+              - unique
+              - not_null
+          - name: NOMBRE
+            description: "Token anonimizado (BOMBERO_001, BOMBERO_002...)."
+          - name: TYPE
+            description: "Rol en el sistema: jefe, mando, bombero."
+          - name: PUESTO
+            description: "Puesto operativo."
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['Conductor', 'Operador', 'Bombero', 'Subinspector', 'Oficial']
+
+      - name: parks
+        description: "Parques de bomberos (Norte y Sur)."
+        columns:
+          - name: ID_PARQUE
+            data_tests:
+              - unique
+              - not_null
+
+      - name: brigades
+        description: "Brigadas operativas (A-F) y brigadas especiales."
+        columns:
+          - name: ID_BRIGADA
+            data_tests:
+              - unique
+              - not_null
+
+      - name: extra_hours
+        description: "Registro de horas extra realizadas por bombero y día."
+        columns:
+          - name: ID
+            data_tests:
+              - unique
+              - not_null
+          - name: ID_EMPLEADO
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('bronze', 'users')
+                    field: ID_EMPLEADO
+          - name: ID_SALARIO
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('bronze', 'salaries')
+                    field: ID_SALARIO
+
+      - name: salaries
+        description: "Tarifas salariales por tipo (Subinspector/Tropa)."
+        columns:
+          - name: ID_SALARIO
+            data_tests:
+              - unique
+              - not_null
+          - name: TIPO
+            description: "Subinspector o Tropa."
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['Subinspector', 'Tropa']
+
+      - name: date
+        description: "Calendario de festivos/laborables. Actualmente vacía."
+
+      - name: guards
+        description: "Guardias diarias por brigada con tipo de día."
+        columns:
+          - name: ID
+            data_tests:
+              - unique
+              - not_null
+          - name: TIPO
+            description: "Festivo, Prefestivo, Laborable, Festivo víspera."
+
+      - name: requests
+        description: "Solicitudes de permisos y vacaciones."
+        columns:
+          - name: ID
+            data_tests:
+              - unique
+              - not_null
+          - name: ESTADO
+            description: "Pendiente, Confirmada, Cancelada, Denegada."
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['Pendiente', 'Confirmada', 'Cancelada', 'Denegada']
+
+      - name: shift_change_requests
+        description: "Solicitudes de cambio de guardia entre bomberos."
+        columns:
+          - name: ID
+            data_tests:
+              - unique
+              - not_null
+          - name: ESTADO
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['rechazado', 'aceptado_por_empleados', 'en_tramite', 'aceptado']
+
+      - name: firefighters_assignments
+        description: "Asignaciones de bomberos entre brigadas (ida/vuelta), requerimientos y traslados."
+        columns:
+          - name: ID_ASIGNACION
+            data_tests:
+              - unique
+              - not_null
+          - name: TIPO_ASIGNACION
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['ida', 'vuelta']
+
+      - name: incidents
+        description: "Incidencias sobre vehículos, personal, equipos e instalaciones."
+        columns:
+          - name: ID_INCIDENCIA
+            data_tests:
+              - unique
+              - not_null
+          - name: ESTADO
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['resuelta', 'tramitada', 'pendiente']
+          - name: NIVEL
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['bajo', 'medio', 'alto', '']
+
+      - name: vehicles
+        description: "Vehículos del cuerpo. Matrícula tokenizada (VEHICULO_XXX)."
+        columns:
+          - name: MATRICULA
+            data_tests:
+              - unique
+              - not_null
+
+      - name: equipos_personales
+        description: "Equipos personales (radios, linternas, PTT, etc.)."
+        columns:
+          - name: ID
+            data_tests:
+              - unique
+              - not_null

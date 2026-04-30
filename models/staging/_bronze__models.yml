@@ -1,0 +1,119 @@
+version: 2
+
+models:
+  - name: stg_bronze__users
+    description: "Bomberos y mandos del cuerpo, con nombre tokenizado y categoría de puesto derivada."
+    columns:
+      - name: id_empleado
+        description: "Identificador único del bombero."
+        data_tests:
+          - unique
+          - not_null
+      - name: nombre_token
+        description: "Nombre anonimizado (BOMBERO_001, BOMBERO_002...)."
+        data_tests:
+          - not_null
+      - name: tipo_usuario
+        description: "Rol en el sistema: jefe, mando, bombero, empleado."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['jefe', 'mando', 'bombero', 'empleado']
+      - name: puesto
+        description: "Puesto operativo del bombero. NULL para usuarios administrativos."
+      - name: categoria_puesto
+        description: "Categoría derivada: Tropa, Mando o Administrativo."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Tropa', 'Mando', 'Administrativo', 'Desconocido']
+
+  - name: stg_bronze__parks
+    description: "Parques de bomberos de Granada."
+    columns:
+      - name: id_parque
+        data_tests:
+          - unique
+          - not_null
+      - name: nombre_parque
+        data_tests:
+          - not_null
+
+  - name: stg_bronze__brigades
+    description: "Brigadas operativas y especiales con flag de brigada de servicio."
+    columns:
+      - name: id_brigada
+        data_tests:
+          - unique
+          - not_null
+      - name: id_parque
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__parks')
+                field: id_parque
+      - name: es_brigada_servicio
+        description: "TRUE si es brigada operativa (A-F), FALSE si es especial (Vacaciones, Bajas, etc.)."
+
+  - name: stg_bronze__extra_hours
+    description: "Horas extra realizadas por bombero y día con total calculado."
+    columns:
+      - name: id_hora_extra
+        data_tests:
+          - unique
+          - not_null
+      - name: id_empleado
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__users')
+                field: id_empleado
+      - name: id_salario
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__salaries')
+                field: id_salario
+      - name: horas_diurnas
+        data_tests:
+          - not_null
+      - name: horas_nocturnas
+        data_tests:
+          - not_null
+      - name: total_horas
+        description: "Suma de horas diurnas + nocturnas."
+        data_tests:
+          - not_null
+
+  - name: stg_bronze__salaries
+    description: "Tarifas salariales por tipo de puesto (Subinspector/Tropa) con precios hora diurna y nocturna."
+    columns:
+      - name: id_salario
+        data_tests:
+          - unique
+          - not_null
+      - name: tipo_salario
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Subinspector', 'Tropa']
+
+  - name: stg_bronze__guards
+    description: "Guardias diarias con brigada, parque, tipo de día y salario asociado."
+    columns:
+      - name: id_guardia
+        data_tests:
+          - unique
+          - not_null
+      - name: id_brigada
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__brigades')
+                field: id_brigada
+      - name: tipo_dia
+        description: "Tipo de día: festivo, prefestivo, laborable, festivo víspera."
