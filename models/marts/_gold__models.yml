@@ -1,0 +1,265 @@
+version: 2
+
+models:
+  - name: dim_parque
+    description: "Dimensión de parques de bomberos de Granada."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: parque_key
+        data_type: varchar
+        description: "Surrogate key del parque."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+      - name: id_parque
+        data_type: number
+        description: "Clave natural del parque."
+        data_tests:
+          - unique
+          - not_null
+      - name: nombre_parque
+        data_type: varchar
+        description: "Nombre del parque."
+      - name: ubicacion
+        data_type: varchar
+        description: "Ubicación geográfica del parque."
+
+  - name: dim_brigada
+    description: "Dimensión de brigadas con parque denormalizado (star schema)."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: brigada_key
+        data_type: varchar
+        description: "Surrogate key de la brigada."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+      - name: id_brigada
+        data_type: number
+        description: "Clave natural de la brigada."
+        data_tests:
+          - unique
+          - not_null
+      - name: nombre_brigada
+        data_type: varchar
+        description: "Nombre de la brigada (A-F para operativas)."
+      - name: es_especial
+        data_type: boolean
+        description: "TRUE si es brigada especial (Vacaciones, Bajas, etc.)."
+      - name: es_brigada_servicio
+        data_type: boolean
+        description: "TRUE si es brigada operativa (A-F)."
+      - name: id_parque
+        data_type: number
+        description: "FK natural al parque."
+      - name: nombre_parque
+        data_type: varchar
+        description: "Nombre del parque denormalizado."
+
+  - name: dim_puesto
+    description: "Dimensión de puestos operativos con categoría derivada."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: puesto_key
+        data_type: varchar
+        description: "Surrogate key del puesto."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+      - name: nombre_puesto
+        data_type: varchar
+        description: "Nombre del puesto: Conductor, Operador, Bombero, Subinspector, Oficial."
+        data_tests:
+          - not_null
+      - name: categoria_puesto
+        data_type: varchar
+        description: "Categoría: Tropa o Mando."
+      - name: es_tropa
+        data_type: boolean
+        description: "TRUE si el puesto pertenece a Tropa."
+      - name: es_mando
+        data_type: boolean
+        description: "TRUE si el puesto pertenece a Mando."
+
+  - name: dim_vehiculo
+    description: "Dimensión de vehículos con matrícula tokenizada y parque denormalizado."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: vehiculo_key
+        data_type: varchar
+        description: "Surrogate key del vehículo."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+      - name: matricula_token
+        data_type: varchar
+        description: "Matrícula anonimizada (VEHICULO_001)."
+        data_tests:
+          - unique
+          - not_null
+      - name: nombre_vehiculo
+        data_type: varchar
+        description: "Nombre descriptivo del vehículo."
+      - name: tipo_vehiculo
+        data_type: varchar
+        description: "Tipo de vehículo."
+      - name: anio_vehiculo
+        data_type: number
+        description: "Año del vehículo."
+      - name: id_parque
+        data_type: number
+        description: "FK natural al parque."
+      - name: nombre_parque
+        data_type: varchar
+        description: "Nombre del parque denormalizado."
+
+  - name: dim_equipo
+    description: "Dimensión de equipos personales con parque denormalizado."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: equipo_key
+        data_type: varchar
+        description: "Surrogate key del equipo."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+      - name: id_equipo
+        data_type: number
+        description: "Clave natural del equipo."
+        data_tests:
+          - unique
+          - not_null
+      - name: nombre_equipo
+        data_type: varchar
+        description: "Nombre del equipo."
+      - name: categoria_equipo
+        data_type: varchar
+        description: "Categoría del equipo."
+      - name: esta_disponible
+        data_type: boolean
+        description: "TRUE si el equipo está disponible."
+      - name: id_parque
+        data_type: number
+        description: "FK natural al parque."
+      - name: nombre_parque
+        data_type: varchar
+        description: "Nombre del parque denormalizado."
+
+  - name: dim_salario
+    description: "Dimensión de tarifas salariales por tipo de puesto."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: salario_key
+        data_type: varchar
+        description: "Surrogate key del salario."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+      - name: id_salario
+        data_type: number
+        description: "Clave natural del salario."
+        data_tests:
+          - unique
+          - not_null
+      - name: tipo_salario
+        data_type: varchar
+        description: "Subinspector o Tropa."
+      - name: fecha_vigencia
+        data_type: date
+        description: "Fecha de inicio de vigencia de la tarifa."
+      - name: precio_hora_diurna
+        data_type: number
+        description: "Precio por hora diurna."
+      - name: precio_hora_nocturna
+        data_type: number
+        description: "Precio por hora nocturna."
+      - name: horas_diurnas_jornada
+        data_type: number
+        description: "Horas diurnas según tipo de día (15/6/2)."
+      - name: horas_nocturnas_jornada
+        data_type: number
+        description: "Horas nocturnas según tipo de día (9/18/22)."
+
+  - name: dim_fecha
+    description: "Dimensión de calendario generada desde las guardias con tipo de día, festivos y atributos temporales."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: fecha_key
+        data_type: varchar
+        description: "Surrogate key de la fecha."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+      - name: fecha
+        data_type: date
+        description: "Fecha natural."
+        data_tests:
+          - unique
+          - not_null
+      - name: anio
+        data_type: number
+        description: "Año."
+      - name: trimestre
+        data_type: number
+        description: "Trimestre (1-4)."
+      - name: mes
+        data_type: number
+        description: "Mes (1-12)."
+      - name: mes_nombre
+        data_type: varchar
+        description: "Nombre del mes."
+      - name: semana_anio
+        data_type: number
+        description: "Semana del año (1-52)."
+      - name: dia
+        data_type: number
+        description: "Día del mes."
+      - name: dia_semana_num
+        data_type: number
+        description: "Día de la semana numérico (0=Domingo)."
+      - name: dia_semana_nombre
+        data_type: varchar
+        description: "Nombre del día de la semana."
+      - name: tipo_dia
+        data_type: varchar
+        description: "Tipo de día: festivo, prefestivo, laborable."
+      - name: es_festivo
+        data_type: boolean
+        description: "TRUE si es día festivo."
+      - name: es_prefestivo
+        data_type: boolean
+        description: "TRUE si es día prefestivo."
+      - name: es_laborable
+        data_type: boolean
+        description: "TRUE si es día laborable."
+      - name: es_fin_de_semana
+        data_type: boolean
+        description: "TRUE si es sábado o domingo."
