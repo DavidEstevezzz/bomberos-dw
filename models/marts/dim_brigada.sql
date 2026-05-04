@@ -37,3 +37,14 @@ dim_brigada AS (
 )
 
 SELECT * FROM dim_brigada
+
+UNION ALL
+
+SELECT
+    {{ dbt_utils.generate_surrogate_key(['-1']) }} AS brigada_key
+    , -1 AS id_brigada
+    , 'Desconocida' AS nombre_brigada
+    , FALSE AS es_especial
+    , FALSE AS es_brigada_servicio
+    , -1 AS id_parque
+    , 'Desconocido' AS nombre_parque

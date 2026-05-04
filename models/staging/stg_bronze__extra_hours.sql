@@ -17,6 +17,7 @@ extra_hours_renamed AS (
         , COALESCE(HORAS_NOCTURNAS, 0) AS horas_nocturnas
         {{ campos_auditoria() }}
     FROM src_extra_hours
+    WHERE DATE >= '2020-01-01'
 ),
 
 -- campos derivados

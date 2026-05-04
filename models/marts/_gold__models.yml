@@ -16,7 +16,7 @@ models:
           - unique
           - not_null
       - name: id_parque
-        data_type: number
+        data_type: number(38,0)
         description: "Clave natural del parque."
         data_tests:
           - unique
@@ -43,7 +43,7 @@ models:
           - unique
           - not_null
       - name: id_brigada
-        data_type: number
+        data_type: number(38,0)
         description: "Clave natural de la brigada."
         data_tests:
           - unique
@@ -58,7 +58,7 @@ models:
         data_type: boolean
         description: "TRUE si es brigada operativa (A-F)."
       - name: id_parque
-        data_type: number
+        data_type: number(38,0)
         description: "FK natural al parque."
       - name: nombre_parque
         data_type: varchar
@@ -120,10 +120,10 @@ models:
         data_type: varchar
         description: "Tipo de vehículo."
       - name: anio_vehiculo
-        data_type: number
+        data_type: number(38,0)
         description: "Año del vehículo."
       - name: id_parque
-        data_type: number
+        data_type: number(38,0)
         description: "FK natural al parque."
       - name: nombre_parque
         data_type: varchar
@@ -144,7 +144,7 @@ models:
           - unique
           - not_null
       - name: id_equipo
-        data_type: number
+        data_type: number(38,0)
         description: "Clave natural del equipo."
         data_tests:
           - unique
@@ -159,7 +159,7 @@ models:
         data_type: boolean
         description: "TRUE si el equipo está disponible."
       - name: id_parque
-        data_type: number
+        data_type: number(38,0)
         description: "FK natural al parque."
       - name: nombre_parque
         data_type: varchar
@@ -180,7 +180,7 @@ models:
           - unique
           - not_null
       - name: id_salario
-        data_type: number
+        data_type: number(38,0)
         description: "Clave natural del salario."
         data_tests:
           - unique
@@ -192,16 +192,16 @@ models:
         data_type: date
         description: "Fecha de inicio de vigencia de la tarifa."
       - name: precio_hora_diurna
-        data_type: number
+        data_type: number(38,0)
         description: "Precio por hora diurna."
       - name: precio_hora_nocturna
-        data_type: number
+        data_type: number(38,0)
         description: "Precio por hora nocturna."
       - name: horas_diurnas_jornada
-        data_type: number
+        data_type: number(38,0)
         description: "Horas diurnas según tipo de día (15/6/2)."
       - name: horas_nocturnas_jornada
-        data_type: number
+        data_type: number(38,0)
         description: "Horas nocturnas según tipo de día (9/18/22)."
 
   - name: dim_fecha
@@ -225,25 +225,25 @@ models:
           - unique
           - not_null
       - name: anio
-        data_type: number
+        data_type: number(38,0)
         description: "Año."
       - name: trimestre
-        data_type: number
+        data_type: number(38,0)
         description: "Trimestre (1-4)."
       - name: mes
-        data_type: number
+        data_type: number(38,0)
         description: "Mes (1-12)."
       - name: mes_nombre
         data_type: varchar
         description: "Nombre del mes."
       - name: semana_anio
-        data_type: number
+        data_type: number(38,0)
         description: "Semana del año (1-52)."
       - name: dia
-        data_type: number
+        data_type: number(38,0)
         description: "Día del mes."
       - name: dia_semana_num
-        data_type: number
+        data_type: number(38,0)
         description: "Día de la semana numérico (0=Domingo)."
       - name: dia_semana_nombre
         data_type: varchar
@@ -263,3 +263,318 @@ models:
       - name: es_fin_de_semana
         data_type: boolean
         description: "TRUE si es sábado o domingo."
+      - name: sin_datos_guardia
+        data_type: boolean
+        description: "TRUE si no hay registro de guardia para esta fecha (fecha fuera del calendario de guardias)."
+
+  - name: dim_empleado
+    description: "Dimensión de empleados SCD Tipo 2. Cada cambio de puesto o rol genera una nueva versión."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: empleado_key
+        data_type: varchar
+        description: "Surrogate key única por versión del empleado (id_empleado + fecha_inicio_validez)."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+      - name: id_empleado
+        data_type: number(38,0)
+        description: "Clave natural del bombero."
+        data_tests:
+          - not_null
+      - name: nombre_token
+        data_type: varchar
+        description: "Nombre anonimizado (BOMBERO_XXX)."
+      - name: tipo_usuario
+        data_type: varchar
+        description: "Rol: jefe, mando, bombero, empleado."
+      - name: puesto
+        data_type: varchar
+        description: "Puesto operativo."
+      - name: categoria_puesto
+        data_type: varchar
+        description: "Categoría: Tropa, Mando, Administrativo."
+      - name: es_mando_especial
+        data_type: boolean
+        description: "TRUE si es mando especial."
+      - name: fecha_inicio_validez
+        data_type: timestamp_ntz
+        description: "Fecha desde la que esta versión es válida."
+        data_tests:
+          - not_null
+      - name: fecha_fin_validez
+        data_type: timestamp_ntz
+        description: "Fecha hasta la que esta versión fue válida. NULL si es la versión actual."
+      - name: es_version_actual
+        data_type: boolean
+        description: "TRUE si es la versión vigente del empleado (no eliminado y sin fecha fin)."
+      - name: es_eliminado
+        data_type: boolean
+        description: "TRUE si el empleado fue dado de baja del sistema (hard delete detectado)."
+    
+  - name: fact_horas_extra
+    description: "Tabla de hechos de horas extra con costes calculados. Materialización incremental."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: horas_extra_key
+        data_type: varchar
+        description: "Surrogate key del hecho."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+      - name: empleado_key_natural
+        data_type: varchar
+        description: "FK natural al empleado (hash de id_empleado)."
+      - name: fecha_key
+        data_type: varchar
+        description: "FK a dim_fecha."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+      - name: brigada_key
+        data_type: varchar
+        description: "FK a dim_brigada de la guardia."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_brigada')
+                field: brigada_key
+      - name: salario_key
+        data_type: varchar
+        description: "FK a dim_salario."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_salario')
+                field: salario_key
+      - name: id_hora_extra
+        data_type: number(38,0)
+        description: "Clave natural de la hora extra."
+      - name: id_empleado
+        data_type: number(38,0)
+        description: "ID del bombero."
+      - name: fecha
+        data_type: date
+        description: "Fecha de la hora extra."
+      - name: id_salario
+        data_type: number(38,0)
+        description: "ID del salario aplicado."
+      - name: horas_diurnas
+        data_type: number(38,0)
+        description: "Horas diurnas realizadas."
+      - name: horas_nocturnas
+        data_type: number(38,0)
+        description: "Horas nocturnas realizadas."
+      - name: total_horas
+        data_type: number(38,0)
+        description: "Total de horas (diurnas + nocturnas)."
+      - name: precio_hora_diurna
+        data_type: number(38,0)
+        description: "Precio por hora diurna según tarifa."
+      - name: precio_hora_nocturna
+        data_type: number(38,0)
+        description: "Precio por hora nocturna según tarifa."
+      - name: coste_diurno
+        data_type: number(38,0)
+        description: "Coste total diurno (horas × precio)."
+      - name: coste_nocturno
+        data_type: number(38,0)
+        description: "Coste total nocturno (horas × precio)."
+      - name: coste_total
+        data_type: number(38,0)
+        description: "Coste total de la hora extra (diurno + nocturno)."
+      - name: tipo_dia
+        data_type: varchar
+        description: "Tipo de día: festivo, prefestivo, laborable."
+      - name: tipo_salario
+        data_type: varchar
+        description: "Tipo de salario: Subinspector o Tropa."
+      - name: fecha_creacion
+        data_type: timestamp_ntz
+        description: "Fecha de creación del registro."
+      - name: fecha_actualizacion
+        data_type: timestamp_ntz
+        description: "Fecha de última actualización."
+
+        
+
+  - name: fact_solicitudes
+    description: "Tabla de hechos de solicitudes de permisos con asignaciones y requerimientos generados. Materialización incremental."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: solicitud_key
+        data_type: varchar
+        description: "Surrogate key del hecho."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+      - name: empleado_key_natural
+        data_type: varchar
+        description: "FK natural al empleado solicitante."
+      - name: fecha_inicio_key
+        data_type: varchar
+        description: "FK a dim_fecha (fecha inicio permiso). Role-playing dimension."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+      - name: fecha_fin_key
+        data_type: varchar
+        description: "FK a dim_fecha (fecha fin permiso). Role-playing dimension."
+      - name: id_solicitud
+        data_type: number(38,0)
+        description: "Clave natural de la solicitud."
+      - name: id_empleado
+        data_type: number(38,0)
+        description: "ID del bombero solicitante."
+      - name: id_empleado_gestor
+        data_type: number(38,0)
+        description: "ID del gestor que tramita la solicitud."
+      - name: tipo_permiso
+        data_type: varchar
+        description: "Tipo de permiso solicitado."
+      - name: turno
+        data_type: varchar
+        description: "Turno afectado."
+      - name: estado
+        data_type: varchar
+        description: "Estado: pendiente, confirmada, cancelada, denegada."
+      - name: fecha_inicio
+        data_type: date
+        description: "Fecha de inicio del permiso."
+      - name: fecha_fin
+        data_type: date
+        description: "Fecha de fin del permiso."
+      - name: horas_solicitadas
+        data_type: number(38,0)
+        description: "Horas solicitadas (para salidas personales)."
+      - name: dias_solicitados
+        data_type: number(38,0)
+        description: "Días de duración calculados (fecha_fin - fecha_inicio + 1)."
+      - name: total_asignaciones_generadas
+        data_type: number(38,0)
+        description: "Número de asignaciones generadas por esta solicitud."
+      - name: total_requerimientos_generados
+        data_type: number(38,0)
+        description: "Número de requerimientos forzados generados."
+      - name: fecha_creacion
+        data_type: timestamp_ntz
+        description: "Fecha de creación."
+      - name: fecha_actualizacion
+        data_type: timestamp_ntz
+        description: "Fecha de última actualización."
+
+  - name: fact_incidencias
+    description: "Tabla de hechos de incidencias con tiempo de resolución y flags de estado. Materialización incremental."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: incidencia_key
+        data_type: varchar
+        description: "Surrogate key del hecho."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+      - name: empleado_creador_key
+        data_type: varchar
+        description: "FK al empleado que creó la incidencia."
+      - name: empleado_resolutor_key
+        data_type: varchar
+        description: "FK al empleado que resolvió la incidencia."
+      - name: fecha_key
+        data_type: varchar
+        description: "FK a dim_fecha."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+      - name: parque_key
+        data_type: varchar
+        description: "FK a dim_parque."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_parque')
+                field: parque_key
+      - name: vehiculo_key
+        data_type: varchar
+        description: "FK a dim_vehiculo (solo si tipo=vehiculo)."
+      - name: equipo_key
+        data_type: varchar
+        description: "FK a dim_equipo (solo si tipo=equipo)."
+      - name: id_incidencia
+        data_type: number(38,0)
+        description: "Clave natural."
+      - name: id_empleado_creador
+        data_type: number(38,0)
+        description: "ID del creador."
+      - name: id_empleado_resolutor
+        data_type: varchar
+        description: "ID del resolutor."
+      - name: id_empleado_referenciado
+        data_type: varchar
+        description: "ID del empleado referenciado (si tipo=personal)."
+      - name: fecha_incidencia
+        data_type: date
+        description: "Fecha de la incidencia."
+      - name: id_parque
+        data_type: number(38,0)
+        description: "ID del parque."
+      - name: matricula_vehiculo
+        data_type: varchar
+        description: "Matrícula tokenizada del vehículo."
+      - name: id_equipo
+        data_type: number(38,0)
+        description: "ID del equipo personal."
+      - name: nombre_equipo_comun
+        data_type: varchar
+        description: "Nombre del equipo común (texto libre)."
+      - name: tipo_incidencia
+        data_type: varchar
+        description: "Tipo: vehiculo, personal, equipo, instalacion, vestuario, equipos_comunes."
+      - name: estado
+        data_type: varchar
+        description: "Estado: resuelta, tramitada, pendiente."
+      - name: nivel_gravedad
+        data_type: varchar
+        description: "Nivel: bajo, medio, alto."
+      - name: esta_leido
+        data_type: boolean
+        description: "TRUE si la incidencia fue leída."
+      - name: dias_resolucion
+        data_type: number(38,0)
+        description: "Días entre creación y resolución (solo para resueltas)."
+      - name: es_resuelta
+        data_type: number(38,0)
+        description: "1 si está resuelta, 0 si no."
+      - name: es_pendiente
+        data_type: number(38,0)
+        description: "1 si está pendiente, 0 si no."
+      - name: es_tramitada
+        data_type: number(38,0)
+        description: "1 si está tramitada, 0 si no."
+      - name: fecha_creacion
+        data_type: timestamp_ntz
+        description: "Fecha de creación."
+      - name: fecha_actualizacion
+        data_type: timestamp_ntz
+        description: "Fecha de última actualización."

@@ -27,11 +27,17 @@ incidents_renamed AS (
 ),
 
 -- campos derivados
+
 incidents_with_metrics AS (
     SELECT
         *
         , CASE
-            WHEN estado = 'resuelta' AND fecha_creacion IS NOT NULL AND fecha_actualizacion IS NOT NULL
+            WHEN estado = 'resuelta' 
+              AND fecha_creacion IS NOT NULL 
+              AND fecha_actualizacion IS NOT NULL
+              AND fecha_creacion >= '2020-01-01'
+              AND fecha_actualizacion >= '2020-01-01'
+              AND DATEDIFF('day', fecha_creacion, fecha_actualizacion) BETWEEN 0 AND 3650
             THEN DATEDIFF('day', fecha_creacion, fecha_actualizacion)
             ELSE NULL
           END AS dias_resolucion
