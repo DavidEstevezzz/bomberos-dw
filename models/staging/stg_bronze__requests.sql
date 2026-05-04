@@ -22,6 +22,7 @@ requests_renamed AS (
         , GUARDIAS_SELECCIONADAS AS guardias_seleccionadas_json
         {{ campos_auditoria() }}
     FROM src_requests
+    WHERE FECHA_INI IS NULL OR FECHA_INI >= '2020-01-01'
 )
 
 SELECT * FROM requests_renamed

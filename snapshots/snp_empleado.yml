@@ -1,0 +1,28 @@
+version: 2
+
+snapshots:
+  - name: snp_empleado
+    description: "Snapshot SCD Tipo 2 de empleados. Captura cambios estructurales: puesto, tipo y rol."
+    relation: ref('stg_bronze__users')
+    config:
+      strategy: check
+      unique_key: id_empleado
+      check_cols:
+        - tipo_usuario
+        - puesto
+        - categoria_puesto
+        - es_mando_especial
+      hard_deletes: new_record
+    columns:
+      - name: id_empleado
+        description: "Identificador único del bombero."
+      - name: nombre_token
+        description: "Nombre anonimizado (BOMBERO_XXX)."
+      - name: tipo_usuario
+        description: "Rol: jefe, mando, bombero, empleado."
+      - name: puesto
+        description: "Puesto operativo."
+      - name: categoria_puesto
+        description: "Categoría derivada: Tropa, Mando, Administrativo."
+      - name: es_mando_especial
+        description: "TRUE si es mando especial."

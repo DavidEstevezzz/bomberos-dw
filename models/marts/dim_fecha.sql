@@ -1,6 +1,20 @@
 WITH 
 
--- import CTE: extraer fechas únicas de guardias
+-- import CTE: generar rango completo de fechas
+date_spine AS (
+    SELECT
+        DATEADD('day', seq4(), '2020-01-01'::DATE) AS fecha
+    FROM TABLE(GENERATOR(ROWCOUNT => 3000))
+),
+
+-- filtrar solo hasta la fecha máxima de datos
+date_range AS (
+    SELECT fecha
+    FROM date_spine
+    WHERE fecha <= CURRENT_DATE() + 365
+),
+
+-- tipo de día desde guardias (puede no existir para todas las fechas)
 stg_guards AS (
     SELECT
         fecha
@@ -10,36 +24,42 @@ stg_guards AS (
     GROUP BY fecha
 ),
 
--- atributos de calendario derivados
+-- unir fechas completas con tipo de día
 fechas_enriched AS (
     SELECT
-        fecha
-        , tipo_dia
-        , EXTRACT(YEAR FROM fecha) AS anio
-        , EXTRACT(MONTH FROM fecha) AS mes
-        , EXTRACT(DAY FROM fecha) AS dia
-        , EXTRACT(QUARTER FROM fecha) AS trimestre
-        , DAYOFWEEK(fecha) AS dia_semana_num
-        , DAYNAME(fecha) AS dia_semana_nombre
-        , MONTHNAME(fecha) AS mes_nombre
-        , WEEKOFYEAR(fecha) AS semana_anio
+        d.fecha
+        , g.tipo_dia
+        , EXTRACT(YEAR FROM d.fecha) AS anio
+        , EXTRACT(MONTH FROM d.fecha) AS mes
+        , EXTRACT(DAY FROM d.fecha) AS dia
+        , EXTRACT(QUARTER FROM d.fecha) AS trimestre
+        , DAYOFWEEK(d.fecha) AS dia_semana_num
+        , DAYNAME(d.fecha) AS dia_semana_nombre
+        , MONTHNAME(d.fecha) AS mes_nombre
+        , WEEKOFYEAR(d.fecha) AS semana_anio
         , CASE
-            WHEN tipo_dia IN ('festivo', 'festivo víspera') THEN TRUE
+            WHEN g.tipo_dia IN ('festivo', 'festivo víspera') THEN TRUE
             ELSE FALSE
           END AS es_festivo
         , CASE
-            WHEN tipo_dia = 'prefestivo' THEN TRUE
+            WHEN g.tipo_dia = 'prefestivo' THEN TRUE
             ELSE FALSE
           END AS es_prefestivo
         , CASE
-            WHEN tipo_dia = 'laborable' THEN TRUE
+            WHEN g.tipo_dia = 'laborable' THEN TRUE
             ELSE FALSE
           END AS es_laborable
         , CASE
-            WHEN DAYOFWEEK(fecha) IN (0, 6) THEN TRUE
+            WHEN DAYOFWEEK(d.fecha) IN (0, 6) THEN TRUE
             ELSE FALSE
           END AS es_fin_de_semana
-    FROM stg_guards
+        , CASE
+            WHEN g.tipo_dia IS NULL THEN TRUE
+            ELSE FALSE
+          END AS sin_datos_guardia
+    FROM date_range d
+    LEFT JOIN stg_guards g
+        ON d.fecha = g.fecha
 ),
 
 -- surrogate key
@@ -60,6 +80,7 @@ dim_fecha AS (
         , es_prefestivo
         , es_laborable
         , es_fin_de_semana
+        , sin_datos_guardia
     FROM fechas_enriched
 )
 
