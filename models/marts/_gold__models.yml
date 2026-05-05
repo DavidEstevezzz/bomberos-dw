@@ -1,4 +1,7 @@
-version: 2
+
+
+
+  version: 2
 
 models:
   - name: dim_parque
@@ -746,3 +749,4 @@ models:
         data_tests:
           - unique
           - not_null
+
