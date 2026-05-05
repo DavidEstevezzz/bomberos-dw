@@ -457,6 +457,8 @@ models:
       - name: fecha
         data_type: date
         description: "Fecha de la hora extra."
+        dimension:
+          type: time
       - name: id_salario
         data_type: number(38,0)
         description: "ID del salario aplicado."
@@ -646,9 +648,13 @@ models:
       - name: fecha_inicio
         data_type: date
         description: "Fecha de inicio del permiso."
+        dimension:
+          type: time
       - name: fecha_fin
         data_type: date
         description: "Fecha de fin del permiso."
+        dimension:
+          type: time
       - name: horas_solicitadas
         data_type: number(38,0)
         description: "Horas solicitadas (para salidas personales)."
@@ -833,6 +839,8 @@ models:
       - name: fecha_incidencia
         data_type: date
         description: "Fecha de la incidencia."
+        dimension:
+          type: time
       - name: id_parque
         data_type: number(38,0)
         description: "ID del parque."
