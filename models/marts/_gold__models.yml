@@ -709,7 +709,7 @@ models:
         data_tests:
           - dbt_utils.expression_is_true:
               arguments:
-                expression: ">= 0"
+                expression: "dias_resolucion >= 0"
               config:
                 where: "dias_resolucion IS NOT NULL"
       - name: es_resuelta
