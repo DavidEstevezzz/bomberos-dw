@@ -21,17 +21,23 @@ semantic_models:
           time_granularity: day
       - name: tipo_dia
         type: categorical
+        expr: tipo_dia
       - name: tipo_salario
         type: categorical
+        expr: tipo_salario
     measures:
       - name: coste_total
         agg: sum
+        expr: coste_total
       - name: coste_diurno
         agg: sum
+        expr: coste_diurno
       - name: coste_nocturno
         agg: sum
+        expr: coste_nocturno
       - name: total_horas
         agg: sum
+        expr: total_horas
       - name: bomberos_distintos
         agg: count_distinct
         expr: id_empleado
@@ -56,16 +62,20 @@ semantic_models:
           time_granularity: day
       - name: estado
         type: categorical
+        expr: estado
       - name: tipo_permiso
         type: categorical
+        expr: tipo_permiso
       - name: turno
         type: categorical
+        expr: turno
     measures:
       - name: conteo_solicitudes
         agg: count
         expr: id_solicitud
       - name: dias_solicitados
         agg: sum
+        expr: dias_solicitados
       - name: suma_asignaciones
         agg: sum
         expr: total_asignaciones_generadas
@@ -99,10 +109,13 @@ semantic_models:
           time_granularity: day
       - name: estado
         type: categorical
+        expr: estado
       - name: nivel_gravedad
         type: categorical
+        expr: nivel_gravedad
       - name: tipo_incidencia
         type: categorical
+        expr: tipo_incidencia
     measures:
       - name: total_incidencias
         agg: count
@@ -155,7 +168,7 @@ metrics:
     type_params:
       measure:
         name: conteo_solicitudes
-    filter: "{{ Dimension('solicitudes__estado') }} = 'confirmada'"
+    filter: "{{ Dimension('estado') }} = 'confirmada'"
 
   - name: m_tasa_aprobacion
     type: ratio
