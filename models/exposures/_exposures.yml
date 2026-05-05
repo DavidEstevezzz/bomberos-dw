@@ -1,0 +1,140 @@
+version: 2
+
+exposures:
+
+  # ============================================================
+  # CASO 1 — HORAS EXTRA Y COSTES
+  # ============================================================
+  - name: dashboard_horas_extra
+    label: "Dashboard de Horas Extra y Costes"
+    type: dashboard
+    maturity: low
+    url: https://bi.bomberosgranada.es/d/horas-extra
+    description: |
+      Dashboard de seguimiento del coste de horas extra del cuerpo de bomberos.
+      Responde a preguntas operativas y económicas:
+        - Distribución del gasto por día de la semana / festivos / laborables
+        - Brigadas y parques con mayor gasto
+        - Bomberos con mayor concentración de horas extra
+        - Evolución mensual y trimestral
+        - Peso del coste nocturno frente al diurno
+      Consume métricas del semantic model 'horas_extra'.
+    depends_on:
+      - ref('fact_horas_extra')
+      - ref('dim_empleado')
+      - ref('dim_brigada')
+      - ref('dim_fecha')
+      - ref('dim_salario')
+      - metric('coste_total_horas_extra')
+      - metric('coste_diurno_horas_extra')
+      - metric('coste_nocturno_horas_extra')
+      - metric('total_horas_extra')
+      - metric('coste_medio_por_hora')
+      - metric('bomberos_con_horas_extra')
+    owner:
+      name: "Jefatura del Cuerpo de Bomberos de Granada"
+      email: jefatura@bomberosgranada.es
+    config:
+      tags:
+        - gold
+        - presentation_portfolio
+        - business_critical
+        - dominio_costes
+      meta:
+        criticality: high
+        refresh_frequency: daily
+        domain: operaciones_economicas
+        pii_status: masked
+
+  # ============================================================
+  # CASO 2 — PERMISOS, AUSENCIAS Y REQUERIMIENTOS
+  # ============================================================
+  - name: dashboard_permisos_requerimientos
+    label: "Dashboard de Permisos y Presión Operativa"
+    type: dashboard
+    maturity: low
+    url: https://bi.bomberosgranada.es/d/permisos
+    description: |
+      Dashboard de gestión de solicitudes de permisos y su impacto en la operativa.
+      Responde a:
+        - Tipos de permiso más solicitados
+        - Distribución de estados (confirmadas, denegadas, pendientes, canceladas)
+        - Impacto de las ausencias en los requerimientos forzados
+        - Asignaciones generadas por solicitud
+        - Presión operativa mensual sobre el cuadrante
+      Consume métricas del semantic model 'solicitudes'.
+    depends_on:
+      - ref('fact_solicitudes')
+      - ref('dim_empleado')
+      - ref('dim_fecha')
+      - metric('total_solicitudes')
+      - metric('solicitudes_confirmadas')
+      - metric('solicitudes_denegadas')
+      - metric('dias_ausencia_solicitados')
+      - metric('total_asignaciones_generadas')
+      - metric('total_requerimientos')
+      - metric('tasa_aprobacion')
+      - metric('tasa_denegacion')
+      - metric('ratio_requerimientos_por_solicitud')
+    owner:
+      name: "Recursos Humanos - Bomberos Granada"
+      email: rrhh@bomberosgranada.es
+    config:
+      tags:
+        - gold
+        - presentation_portfolio
+        - business_critical
+        - dominio_personal
+      meta:
+        criticality: high
+        refresh_frequency: daily
+        domain: gestion_personal
+        pii_status: masked
+
+  # ============================================================
+  # CASO 3 — INCIDENCIAS Y MTTR
+  # ============================================================
+  - name: dashboard_incidencias
+    label: "Dashboard de Incidencias y Tiempo de Resolución"
+    type: dashboard
+    maturity: low
+    url: https://bi.bomberosgranada.es/d/incidencias
+    description: |
+      Dashboard de seguimiento de incidencias sobre vehículos, equipos personales
+      e instalaciones, con foco en tiempo medio de resolución (MTTR).
+      Responde a:
+        - Tiempo medio de resolución global y por nivel de gravedad
+        - Tipos de incidencia más lentos de resolver
+        - Parques con mejor tiempo de resolución
+        - Empleados que más incidencias resuelven
+        - Vehículos y equipos con más incidencias generadas
+        - Distribución de estados (pendiente, tramitada, resuelta)
+      Consume métricas del semantic model 'incidencias'.
+    depends_on:
+      - ref('fact_incidencias')
+      - ref('dim_empleado')
+      - ref('dim_parque')
+      - ref('dim_vehiculo')
+      - ref('dim_equipo')
+      - ref('dim_fecha')
+      - metric('total_incidencias')
+      - metric('incidencias_resueltas')
+      - metric('incidencias_pendientes')
+      - metric('incidencias_tramitadas')
+      - metric('mttr_dias')
+      - metric('tasa_resolucion')
+      - metric('tasa_pendientes')
+    owner:
+      name: "Mantenimiento - Bomberos Granada"
+      email: mantenimiento@bomberosgranada.es
+    config:
+      tags:
+        - gold
+        - presentation_portfolio
+        - business_critical
+        - dominio_mantenimiento
+      meta:
+        criticality: medium
+        refresh_frequency: daily
+        domain: mantenimiento_operativo
+        pii_status: masked

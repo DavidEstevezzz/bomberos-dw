@@ -50,36 +50,40 @@ incidents_with_resolver AS (
 
 final AS (
     SELECT
-        {{ dbt_utils.generate_surrogate_key(['id_incidencia']) }} AS incidencia_key
-        , empleado_creador_key
-        , empleado_resolutor_key
-        , {{ dbt_utils.generate_surrogate_key(['fecha_incidencia']) }} AS fecha_key
-        , {{ dbt_utils.generate_surrogate_key(['id_parque']) }} AS parque_key
-        , {{ dbt_utils.generate_surrogate_key(['matricula_vehiculo']) }} AS vehiculo_key
-        , {{ dbt_utils.generate_surrogate_key(['id_equipo']) }} AS equipo_key
+        {{ dbt_utils.generate_surrogate_key(['id_incidencia']) }}::varchar AS incidencia_key
+        , empleado_creador_key::varchar AS empleado_creador_key
+        , empleado_resolutor_key::varchar AS empleado_resolutor_key
+        , {{ dbt_utils.generate_surrogate_key(['fecha_incidencia']) }}::varchar AS fecha_key
+        , {{ dbt_utils.generate_surrogate_key(['id_parque']) }}::varchar AS parque_key
+        , {{ dbt_utils.generate_surrogate_key(['matricula_vehiculo']) }}::varchar AS vehiculo_key
+        , {{ dbt_utils.generate_surrogate_key(['id_equipo']) }}::varchar AS equipo_key
+
         -- degenerate dimensions
-        , id_incidencia
-        , id_empleado_creador
-        , id_empleado_resolutor
-        , id_empleado_referenciado
-        , fecha_incidencia
-        , id_parque
-        , matricula_vehiculo
-        , id_equipo
-        , nombre_equipo_comun
+        , id_incidencia::number(38,0) AS id_incidencia
+        , id_empleado_creador::number(38,0) AS id_empleado_creador
+        , TRY_TO_NUMBER(id_empleado_resolutor)::number(38,0) AS id_empleado_resolutor
+        , TRY_TO_NUMBER(id_empleado_referenciado)::number(38,0) AS id_empleado_referenciado
+        , fecha_incidencia::date AS fecha_incidencia
+        , id_parque::number(38,0) AS id_parque
+        , matricula_vehiculo::varchar AS matricula_vehiculo
+        , TRY_TO_NUMBER(id_equipo)::number(38,0) AS id_equipo
+        , nombre_equipo_comun::varchar AS nombre_equipo_comun
+
         -- atributos del hecho
-        , tipo_incidencia
-        , estado
-        , nivel_gravedad
-        , esta_leido
+        , tipo_incidencia::varchar AS tipo_incidencia
+        , estado::varchar AS estado
+        , nivel_gravedad::varchar AS nivel_gravedad
+        , esta_leido::boolean AS esta_leido
+
         -- medidas
-        , dias_resolucion
-        , CASE WHEN estado = 'resuelta' THEN 1 ELSE 0 END AS es_resuelta
-        , CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END AS es_pendiente
-        , CASE WHEN estado = 'tramitada' THEN 1 ELSE 0 END AS es_tramitada
+        , dias_resolucion::number(38,0) AS dias_resolucion
+        , CASE WHEN estado = 'resuelta' THEN 1 ELSE 0 END::number(38,0) AS es_resuelta
+        , CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END::number(38,0) AS es_pendiente
+        , CASE WHEN estado = 'tramitada' THEN 1 ELSE 0 END::number(38,0) AS es_tramitada
+
         -- auditoría
-        , fecha_creacion
-        , fecha_actualizacion
+        , fecha_creacion::timestamp_ntz AS fecha_creacion
+        , fecha_actualizacion::timestamp_ntz AS fecha_actualizacion
     FROM incidents_with_resolver
 )
 

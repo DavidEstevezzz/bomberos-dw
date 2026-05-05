@@ -1,7 +1,4 @@
-
-
-
-  version: 2
+version: 2
 
 models:
   - name: dim_parque
@@ -9,6 +6,11 @@ models:
     config:
       contract:
         enforced: true
+      group: shared
+      access: public
+      tags:
+        - dimension
+        - shared
     columns:
       - name: parque_key
         data_type: varchar
@@ -36,6 +38,15 @@ models:
     config:
       contract:
         enforced: true
+      group: shared
+      access: public
+      tags:
+        - dimension
+        - shared
+      meta:
+        owner: "Equipo de Datos - Bomberos Granada"
+        criticality: high
+        domain: shared
     columns:
       - name: brigada_key
         data_type: varchar
@@ -103,6 +114,11 @@ models:
     config:
       contract:
         enforced: true
+      group: mantenimiento
+      access: protected
+      tags:
+        - dimension
+        - dominio_mantenimiento
     columns:
       - name: vehiculo_key
         data_type: varchar
@@ -139,6 +155,11 @@ models:
     config:
       contract:
         enforced: true
+      group: mantenimiento
+      access: protected
+      tags:
+        - dimension
+        - dominio_mantenimiento
     columns:
       - name: equipo_key
         data_type: varchar
@@ -175,6 +196,15 @@ models:
     config:
       contract:
         enforced: true
+      group: costes
+      access: protected
+      tags:
+        - dimension
+        - dominio_costes
+      meta:
+        owner: "Jefatura del Cuerpo de Bomberos de Granada"
+        domain: costes
+        contains_sensitive_data: true
     columns:
       - name: salario_key
         data_type: varchar
@@ -184,42 +214,57 @@ models:
         data_tests:
           - unique
           - not_null
+
       - name: id_salario
         data_type: number(38,0)
         description: "Clave natural del salario."
         data_tests:
           - unique
           - not_null
+
       - name: tipo_salario
+        data_type: varchar
+        description: "Tipo de salario aplicado."
         data_tests:
           - accepted_values:
               arguments:
                 values: ['Subinspector', 'Tropa']
+
       - name: fecha_vigencia
         data_type: date
         description: "Fecha de inicio de vigencia de la tarifa."
+
       - name: precio_hora_diurna
-        data_type: number(38,0)
+        data_type: number(10,2)
         description: "Precio por hora diurna."
+
       - name: precio_hora_nocturna
-        data_type: number(38,0)
+        data_type: number(10,2)
         description: "Precio por hora nocturna."
+
       - name: horas_diurnas_jornada
         data_type: number(38,0)
-        description: "Horas diurnas según tipo de día (15/6/2)."
+        description: "Horas diurnas según tipo de día."
+
       - name: horas_nocturnas_jornada
         data_type: number(38,0)
-        description: "Horas nocturnas según tipo de día (9/18/22)."
+        description: "Horas nocturnas según tipo de día."
 
   - name: dim_fecha
-    description: "Dimensión de calendario generada desde las guardias con tipo de día, festivos y atributos temporales."
+    description: "Dimensión de calendario. Construida sobre dim_time (time spine) y enriquecida con tipo de día desde guardias operativas + fallback derivado para días sin guardia."
     config:
       contract:
         enforced: true
+      group: shared
+      access: public
+      tags:
+        - dimension
+        - shared
+        - business_critical
     columns:
       - name: fecha_key
         data_type: varchar
-        description: "Surrogate key de la fecha."
+        description: "Surrogate key del día."
         constraints:
           - type: not_null
         data_tests:
@@ -227,7 +272,9 @@ models:
           - not_null
       - name: fecha
         data_type: date
-        description: "Fecha natural."
+        description: "Día calendario."
+        constraints:
+          - type: not_null
         data_tests:
           - unique
           - not_null
@@ -236,13 +283,13 @@ models:
         description: "Año."
       - name: trimestre
         data_type: number(38,0)
-        description: "Trimestre (1-4)."
+        description: "Trimestre del año (1-4)."
       - name: mes
         data_type: number(38,0)
-        description: "Mes (1-12)."
+        description: "Mes del año (1-12)."
       - name: mes_nombre
         data_type: varchar
-        description: "Nombre del mes."
+        description: "Nombre del mes en inglés (Snowflake MONTHNAME)."
       - name: semana_anio
         data_type: number(38,0)
         description: "Semana del año (1-52)."
@@ -251,34 +298,51 @@ models:
         description: "Día del mes."
       - name: dia_semana_num
         data_type: number(38,0)
-        description: "Día de la semana numérico (0=Domingo)."
+        description: "Día de la semana numérico (0=Domingo, 6=Sábado)."
       - name: dia_semana_nombre
         data_type: varchar
         description: "Nombre del día de la semana."
       - name: tipo_dia
         data_type: varchar
-        description: "Tipo de día: festivo, prefestivo, laborable."
+        description: "Tipo de día: festivo, prefestivo, laborable, fin de semana, festivo víspera. Prioridad: guardia operativa > fallback derivado."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['festivo', 'prefestivo', 'laborable', 'fin de semana', 'festivo víspera']
       - name: es_festivo
         data_type: boolean
-        description: "TRUE si es día festivo."
+        description: "TRUE si tipo_dia='festivo'."
       - name: es_prefestivo
         data_type: boolean
-        description: "TRUE si es día prefestivo."
+        description: "TRUE si tipo_dia='prefestivo' o 'festivo víspera'."
       - name: es_laborable
         data_type: boolean
-        description: "TRUE si es día laborable."
+        description: "TRUE si es laborable (incluye días L-V sin info de guardia)."
       - name: es_fin_de_semana
         data_type: boolean
         description: "TRUE si es sábado o domingo."
       - name: sin_datos_guardia
         data_type: boolean
-        description: "TRUE si no hay registro de guardia para esta fecha (fecha fuera del calendario de guardias)."
+        description: "TRUE si no hay registro de guardia para esta fecha. Útil para auditoría de calidad de dato."
 
   - name: dim_empleado
     description: "Dimensión de empleados SCD Tipo 2. Cada cambio de puesto o rol genera una nueva versión."
     config:
       contract:
         enforced: true
+      group: shared
+      access: public
+      tags:
+        - dimension
+        - scd2
+        - shared
+        - business_critical
+      meta:
+        owner: "Equipo de Datos - Bomberos Granada"
+        criticality: high
+        domain: shared
+        pii_status: masked
+        scd_type: 2
     columns:
       - name: empleado_key
         data_type: varchar
@@ -336,7 +400,40 @@ models:
     config:
       contract:
         enforced: true
+      group: costes
+      access: public
+      tags:
+        - fact
+        - dominio_costes
+        - business_critical
+        - presentation_portfolio
+      meta:
+        owner: "Jefatura del Cuerpo de Bomberos de Granada"
+        domain: costes
+        criticality: high
+        grain: "una fila por id_hora_extra"
+        sla: daily
 
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_horas = horas_diurnas + horas_nocturnas"
+          config:
+            severity: error
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "ABS(coste_total - (coste_diurno + coste_nocturno)) <= 0.01"
+          config:
+            severity: error
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "horas_diurnas >= 0 AND horas_nocturnas >= 0"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "coste_total >= 0"
 
     columns:
       - name: horas_extra_key
@@ -347,26 +444,6 @@ models:
         data_tests:
           - unique
           - not_null
-          # 1. El total de horas debe ser la suma exacta
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "total_horas = horas_diurnas + horas_nocturnas"
-              config:
-                severity: error
-          # 2. El coste total debe ser la suma de costes parciales
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "coste_total = coste_diurno + coste_nocturno"
-              config:
-                severity: error
-          # 3. Las horas no pueden ser negativas
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "horas_diurnas >= 0 AND horas_nocturnas >= 0"
-          # 4. El coste no puede ser negativo (con tolerancia a centimos por redondeo)
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "coste_total >= 0"
       - name: empleado_key
         data_type: varchar
         description: "FK a dim_empleado SCD2 — versión vigente en la fecha de la hora extra."
@@ -424,26 +501,31 @@ models:
         data_type: number(38,0)
         description: "Total de horas (diurnas + nocturnas)."
       - name: precio_hora_diurna
-        data_type: number(38,0)
+        data_type: number(10,2)
         description: "Precio por hora diurna según tarifa."
       - name: precio_hora_nocturna
-        data_type: number(38,0)
+        data_type: number(10,2)
         description: "Precio por hora nocturna según tarifa."
       - name: coste_diurno
-        data_type: number(38,0)
+        data_type: number(12,2)
         description: "Coste total diurno (horas × precio)."
       - name: coste_nocturno
-        data_type: number(38,0)
+        data_type: number(12,2)
         description: "Coste total nocturno (horas × precio)."
       - name: coste_total
-        data_type: number(38,0)
+        data_type: number(12,2)
         description: "Coste total de la hora extra (diurno + nocturno)."
       - name: tipo_dia
+        data_type: varchar
+        description: "Tipo de día asociado a la guardia: festivo, prefestivo, laborable o festivo víspera."
         data_tests:
           - accepted_values:
               arguments:
                 values: ['festivo', 'prefestivo', 'laborable', 'festivo víspera']
+
       - name: tipo_salario
+        data_type: varchar
+        description: "Tipo de tarifa salarial aplicada: Subinspector o Tropa."
         data_tests:
           - accepted_values:
               arguments:
@@ -461,6 +543,38 @@ models:
     config:
       contract:
         enforced: true
+      group: personal
+      access: public
+      tags:
+        - fact
+        - dominio_personal
+        - business_critical
+        - presentation_portfolio
+      meta:
+        owner: "Recursos Humanos - Bomberos Granada"
+        domain: personal
+        criticality: high
+        grain: "una fila por id_solicitud"
+        sla: daily
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "dias_solicitados >= 1"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_asignaciones_generadas >= 0"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_requerimientos_generados <= total_asignaciones_generadas"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "fecha_fin >= fecha_inicio"
+          config:
+            where: "fecha_fin IS NOT NULL"
 
     columns:
       - name: solicitud_key
@@ -471,24 +585,6 @@ models:
         data_tests:
           - unique
           - not_null
-          # 1. Días solicitados al menos 1
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "dias_solicitados >= 1"
-          # 2. Las asignaciones generadas no pueden ser negativas
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "total_asignaciones_generadas >= 0"
-          # 3. Los requerimientos no pueden ser más que las asignaciones (un requerimiento es una asignación forzada)
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "total_requerimientos_generados <= total_asignaciones_generadas"
-          # 4. Si hay fecha_fin, debe ser >= fecha_inicio
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "fecha_fin >= fecha_inicio"
-              config:
-                where: "fecha_fin IS NOT NULL"
       - name: empleado_key
         data_type: varchar
         description: "FK a dim_empleado SCD2 — versión vigente en fecha_inicio del permiso."
@@ -529,6 +625,8 @@ models:
         data_type: number(38,0)
         description: "ID del gestor que tramita la solicitud."
       - name: tipo_permiso
+        data_type: varchar
+        description: "Tipo de permiso solicitado."
         data_tests:
           - not_null
           - accepted_values:
@@ -547,6 +645,8 @@ models:
         data_type: varchar
         description: "Turno afectado."
       - name: estado
+        data_type: varchar
+        description: "Estado de la solicitud."
         data_tests:
           - not_null
           - accepted_values:
@@ -585,7 +685,43 @@ models:
     config:
       contract:
         enforced: true
+      group: mantenimiento
+      access: public
+      tags:
+        - fact
+        - dominio_mantenimiento
+        - business_critical
+        - presentation_portfolio
+      meta:
+        owner: "Mantenimiento - Bomberos Granada"
+        domain: mantenimiento
+        criticality: medium
+        grain: "una fila por id_incidencia"
+        sla: daily
 
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "es_resuelta = 1 AND empleado_resolutor_key IS NOT NULL"
+          config:
+            where: "estado = 'resuelta'"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(es_resuelta + es_pendiente + es_tramitada) = 1"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "dias_resolucion IS NOT NULL"
+          config:
+            where: "estado = 'resuelta'"
+            severity: warn
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "dias_resolucion BETWEEN 0 AND 1825"
+          config:
+            where: "dias_resolucion IS NOT NULL"
 
     columns:
       - name: incidencia_key
@@ -595,30 +731,6 @@ models:
         data_tests:
           - unique
           - not_null
-          # 1. Si la incidencia está resuelta, debe tener resolutor (excepto cuando huérfano '-1')
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "es_resuelta = 1 AND empleado_resolutor_key IS NOT NULL"
-              config:
-                where: "estado = 'resuelta'"
-          # 2. Coherencia entre estado y flags
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "(es_resuelta + es_pendiente + es_tramitada) = 1"
-          # 3. Si está resuelta, dias_resolucion no debería ser NULL
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "dias_resolucion IS NOT NULL"
-              config:
-                where: "estado = 'resuelta'"
-                severity: warn
-                # warn porque tienes el filtro defensivo en staging que pone NULL si fechas son corruptas
-          # 4. dias_resolucion razonable (menos de 5 años — más allá es dato corrupto)
-          - dbt_utils.expression_is_true:
-              arguments:
-                expression: "dias_resolucion BETWEEN 0 AND 1825"
-              config:
-                where: "dias_resolucion IS NOT NULL"
       - name: empleado_creador_key
         data_type: varchar
         description: "FK a dim_empleado SCD2 (rol: creador). Resuelto con fecha_incidencia."
@@ -712,7 +824,7 @@ models:
         data_tests:
           - dbt_utils.expression_is_true:
               arguments:
-                expression: "dias_resolucion >= 0"
+                expression: ">= 0"
               config:
                 where: "dias_resolucion IS NOT NULL"
       - name: es_resuelta
@@ -733,10 +845,16 @@ models:
 
 
   - name: dim_time
-    description: "Time spine diaria para MetricFlow. Necesaria para resolución de granularidades y métricas cumulative."
+    description: "Time spine diaria para MetricFlow. Una fila por día desde 2020 a 2030. Necesaria para resolución de granularidades y métricas cumulative."
     config:
       contract:
         enforced: true
+      group: shared
+      access: public
+      tags:
+        - dimension
+        - shared
+        - infrastructure
     time_spine:
       standard_granularity_column: date_day
     columns:

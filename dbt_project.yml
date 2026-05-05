@@ -18,11 +18,26 @@ clean-targets:
 
 models:
   bomberos_dw:
+    +meta:
+      pii_status: masked       # todos los modelos tienen PII suprimida o tokenizada
+      project: bomberos_dw
+
     staging:
       +materialized: view
-      +schema: SILVER
+      +schema: silver
+      +tags:
+        - silver
+        - staging
+      +meta:
+        layer: silver
+        criticality: medium
+
     marts:
       +materialized: table
-      +schema: GOLD
-      analytics:
-        +materialized: view
+      +schema: gold
+      +tags:
+        - gold
+      +meta:
+        layer: gold
+        criticality: high
+        refresh_frequency: daily

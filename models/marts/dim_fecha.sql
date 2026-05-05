@@ -1,69 +1,87 @@
-WITH 
+{{
+    config(
+        materialized='table'
+    )
+}}
 
--- import CTE: generar rango completo de fechas
-date_spine AS (
-    SELECT
-        DATEADD('day', seq4(), '2020-01-01'::DATE) AS fecha
-    FROM TABLE(GENERATOR(ROWCOUNT => 3000))
+WITH
+
+-- partimos de la time spine: una fila por día garantizada, sin huecos
+spine AS (
+    SELECT date_day AS fecha
+    FROM {{ ref('dim_time') }}
 ),
 
--- filtrar solo hasta la fecha máxima de datos
-date_range AS (
-    SELECT fecha
-    FROM date_spine
-    WHERE fecha <= CURRENT_DATE() + 365
-),
-
--- tipo de día desde guardias (puede no existir para todas las fechas)
+-- guardias del sistema operativo: aporta tipo_dia cuando hay guardia ese día
 stg_guards AS (
+    SELECT * FROM {{ ref('stg_bronze__guards') }}
+),
+
+guards_per_date AS (
     SELECT
         fecha
-        , MIN(tipo_dia) AS tipo_dia
-    FROM {{ ref('stg_bronze__guards') }}
-    WHERE fecha IS NOT NULL
-    GROUP BY fecha
+        , tipo_dia
+        , ROW_NUMBER() OVER (PARTITION BY fecha ORDER BY id_guardia) AS rn
+    FROM stg_guards
 ),
 
--- unir fechas completas con tipo de día
-fechas_enriched AS (
+guards_unique AS (
+    SELECT fecha, tipo_dia AS tipo_dia_guardia
+    FROM guards_per_date
+    WHERE rn = 1
+),
+
+-- enriquecer la spine con atributos de calendario y flags derivados
+enriched AS (
     SELECT
-        d.fecha
-        , g.tipo_dia
-        , EXTRACT(YEAR FROM d.fecha) AS anio
-        , EXTRACT(MONTH FROM d.fecha) AS mes
-        , EXTRACT(DAY FROM d.fecha) AS dia
-        , EXTRACT(QUARTER FROM d.fecha) AS trimestre
-        , DAYOFWEEK(d.fecha) AS dia_semana_num
-        , DAYNAME(d.fecha) AS dia_semana_nombre
-        , MONTHNAME(d.fecha) AS mes_nombre
-        , WEEKOFYEAR(d.fecha) AS semana_anio
+        s.fecha
+        -- atributos puramente derivables del calendario (siempre correctos)
+        , YEAR(s.fecha) AS anio
+        , QUARTER(s.fecha) AS trimestre
+        , MONTH(s.fecha) AS mes
+        , MONTHNAME(s.fecha) AS mes_nombre
+        , WEEKOFYEAR(s.fecha) AS semana_anio
+        , DAY(s.fecha) AS dia
+        , DAYOFWEEK(s.fecha) AS dia_semana_num
+        , DAYNAME(s.fecha) AS dia_semana_nombre
         , CASE
-            WHEN g.tipo_dia IN ('festivo', 'festivo víspera') THEN TRUE
+            WHEN DAYOFWEEK(s.fecha) IN (0, 6) THEN TRUE
+            ELSE FALSE
+          END AS es_fin_de_semana
+        -- tipo_dia: prioridad guardias → fallback derivado
+        , COALESCE(
+            LOWER(g.tipo_dia_guardia),
+            CASE
+                WHEN DAYOFWEEK(s.fecha) IN (0, 6) THEN 'fin de semana'
+                ELSE 'laborable'
+            END
+          ) AS tipo_dia
+        -- flags binarios derivados de tipo_dia
+        , CASE
+            WHEN LOWER(g.tipo_dia_guardia) IN ('festivo') THEN TRUE
             ELSE FALSE
           END AS es_festivo
         , CASE
-            WHEN g.tipo_dia = 'prefestivo' THEN TRUE
+            WHEN LOWER(g.tipo_dia_guardia) IN ('prefestivo', 'festivo víspera') THEN TRUE
             ELSE FALSE
           END AS es_prefestivo
         , CASE
-            WHEN g.tipo_dia = 'laborable' THEN TRUE
+            WHEN g.tipo_dia_guardia IS NULL AND DAYOFWEEK(s.fecha) NOT IN (0, 6) THEN TRUE
+            WHEN LOWER(g.tipo_dia_guardia) = 'laborable' THEN TRUE
             ELSE FALSE
           END AS es_laborable
+        -- flag de calidad: marca cuando no tenemos info de guardia para esa fecha
         , CASE
-            WHEN DAYOFWEEK(d.fecha) IN (0, 6) THEN TRUE
-            ELSE FALSE
-          END AS es_fin_de_semana
-        , CASE
-            WHEN g.tipo_dia IS NULL THEN TRUE
+            WHEN g.tipo_dia_guardia IS NULL THEN TRUE
             ELSE FALSE
           END AS sin_datos_guardia
-    FROM date_range d
-    LEFT JOIN stg_guards g
-        ON d.fecha = g.fecha
+    FROM spine s
+    LEFT JOIN guards_unique g
+        ON s.fecha = g.fecha
 ),
 
--- surrogate key
-dim_fecha AS (
+-- surrogate key final
+final AS (
     SELECT
         {{ dbt_utils.generate_surrogate_key(['fecha']) }} AS fecha_key
         , fecha
@@ -81,7 +99,7 @@ dim_fecha AS (
         , es_laborable
         , es_fin_de_semana
         , sin_datos_guardia
-    FROM fechas_enriched
+    FROM enriched
 )
 
-SELECT * FROM dim_fecha
+SELECT * FROM final
