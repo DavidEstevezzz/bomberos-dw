@@ -1,0 +1,42 @@
+version: 2
+
+groups:
+  - name: costes
+    description: "Modelos relacionados con horas extra, salarios y costes operativos."
+    owner:
+      name: "Jefatura del Cuerpo de Bomberos de Granada"
+      email: jefatura@bomberosgranada.es
+    config:
+      meta:
+        domain: costes
+        criticality: high
+
+  - name: personal
+    description: "Modelos relacionados con solicitudes, permisos, ausencias y gestión de personal."
+    owner:
+      name: "Recursos Humanos - Bomberos Granada"
+      email: rrhh@bomberosgranada.es
+    config:
+      meta:
+        domain: personal
+        criticality: high
+
+  - name: mantenimiento
+    description: "Modelos relacionados con incidencias sobre vehículos, equipos e instalaciones."
+    owner:
+      name: "Mantenimiento - Bomberos Granada"
+      email: mantenimiento@bomberosgranada.es
+    config:
+      meta:
+        domain: mantenimiento
+        criticality: medium
+
+  - name: shared
+    description: "Dimensiones compartidas como calendario, empleados, parques y brigadas."
+    owner:
+      name: "Equipo de Datos - Bomberos Granada"
+      email: datos@bomberosgranada.es
+    config:
+      meta:
+        domain: shared
+        criticality: medium
