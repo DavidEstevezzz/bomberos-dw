@@ -1,0 +1,23 @@
+version: 2
+
+metrics:
+  - name: m_coste_total_horas_extra
+    type: simple
+    label: "Coste total de horas extra"
+    type_params:
+      measure:
+        name: coste_total
+
+  - name: m_total_horas_extra
+    type: simple
+    label: "Total de horas extra"
+    type_params:
+      measure:
+        name: total_horas
+
+  - name: m_coste_medio_por_hora
+    type: ratio
+    label: "Coste medio por hora extra"
+    type_params:
+      numerator: m_coste_total_horas_extra
+      denominator: m_total_horas_extra
