@@ -1,3 +1,4 @@
+
 {{
     config(
         materialized='incremental',
@@ -8,7 +9,6 @@
 
 WITH 
 
--- import CTEs
 stg_incidents AS (
     SELECT * FROM {{ ref('stg_bronze__incidents') }}
     {% if is_incremental() %}
@@ -16,12 +16,43 @@ stg_incidents AS (
     {% endif %}
 ),
 
--- surrogate keys + métricas
+-- fecha de efecto del resolutor: solo cuando hay resolución real
+incidents_with_resolution_date AS (
+    SELECT
+        i.*
+        , CASE
+            WHEN i.estado = 'resuelta' AND i.id_empleado_resolutor IS NOT NULL
+            THEN i.fecha_actualizacion
+            ELSE NULL
+          END AS fecha_efecto_resolutor
+    FROM stg_incidents i
+),
+
+-- point-in-time lookup: empleado creador con fecha_incidencia
+incidents_with_creator AS (
+    SELECT
+        i.*
+        , {{ lookup_empleado_scd2('i.id_empleado_creador', 'i.fecha_incidencia', alias='dec') }} AS empleado_creador_key
+    FROM incidents_with_resolution_date i
+    LEFT JOIN {{ ref('dim_empleado') }} dec
+        {{ join_empleado_scd2('i.id_empleado_creador', 'i.fecha_incidencia', alias='dec') }}
+),
+
+-- point-in-time lookup: empleado resolutor con fecha_actualizacion (solo si resuelta)
+incidents_with_resolver AS (
+    SELECT
+        i.*
+        , {{ lookup_empleado_scd2('i.id_empleado_resolutor', 'i.fecha_efecto_resolutor', alias='der') }} AS empleado_resolutor_key
+    FROM incidents_with_creator i
+    LEFT JOIN {{ ref('dim_empleado') }} der
+        {{ join_empleado_scd2('i.id_empleado_resolutor', 'i.fecha_efecto_resolutor', alias='der') }}
+),
+
 final AS (
     SELECT
         {{ dbt_utils.generate_surrogate_key(['id_incidencia']) }} AS incidencia_key
-        , {{ dbt_utils.generate_surrogate_key(['id_empleado_creador']) }} AS empleado_creador_key
-        , {{ dbt_utils.generate_surrogate_key(['id_empleado_resolutor']) }} AS empleado_resolutor_key
+        , empleado_creador_key
+        , empleado_resolutor_key
         , {{ dbt_utils.generate_surrogate_key(['fecha_incidencia']) }} AS fecha_key
         , {{ dbt_utils.generate_surrogate_key(['id_parque']) }} AS parque_key
         , {{ dbt_utils.generate_surrogate_key(['matricula_vehiculo']) }} AS vehiculo_key
@@ -43,22 +74,13 @@ final AS (
         , esta_leido
         -- medidas
         , dias_resolucion
-        , CASE
-            WHEN estado = 'resuelta' THEN 1
-            ELSE 0
-          END AS es_resuelta
-        , CASE
-            WHEN estado = 'pendiente' THEN 1
-            ELSE 0
-          END AS es_pendiente
-        , CASE
-            WHEN estado = 'tramitada' THEN 1
-            ELSE 0
-          END AS es_tramitada
+        , CASE WHEN estado = 'resuelta' THEN 1 ELSE 0 END AS es_resuelta
+        , CASE WHEN estado = 'pendiente' THEN 1 ELSE 0 END AS es_pendiente
+        , CASE WHEN estado = 'tramitada' THEN 1 ELSE 0 END AS es_tramitada
         -- auditoría
         , fecha_creacion
         , fecha_actualizacion
-    FROM stg_incidents
+    FROM incidents_with_resolver
 )
 
 SELECT * FROM final

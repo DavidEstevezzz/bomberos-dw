@@ -24,3 +24,5 @@ models:
     marts:
       +materialized: table
       +schema: GOLD
+      analytics:
+        +materialized: view
