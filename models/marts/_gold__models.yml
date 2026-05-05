@@ -385,6 +385,9 @@ models:
       - name: horas_extra_key
         data_type: varchar
         description: "Surrogate key del hecho."
+        entity:
+          type: primary
+          name: horas_extra
         constraints:
           - type: not_null
         data_tests:
@@ -551,6 +554,9 @@ models:
       - name: solicitud_key
         data_type: varchar
         description: "Surrogate key del hecho."
+        entity:
+          type: primary
+          name: solicitud
         constraints:
           - type: not_null
         data_tests:
@@ -736,6 +742,9 @@ models:
     columns:
       - name: incidencia_key
         data_type: varchar
+        entity:
+          type: primary
+          name: incidencia
         constraints:
           - type: not_null
         data_tests:
