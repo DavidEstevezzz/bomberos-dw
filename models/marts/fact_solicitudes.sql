@@ -1,3 +1,5 @@
+-- models/marts/fact_solicitudes.sql
+
 {{
     config(
         materialized='incremental',
@@ -8,7 +10,6 @@
 
 WITH 
 
--- import CTEs
 stg_requests AS (
     SELECT * FROM {{ ref('stg_bronze__requests') }}
     {% if is_incremental() %}
@@ -24,7 +25,6 @@ stg_shift_changes AS (
     SELECT * FROM {{ ref('stg_bronze__shift_change_requests') }}
 ),
 
--- contar requerimientos generados por cada solicitud
 requerimientos_por_solicitud AS (
     SELECT
         id_solicitud
@@ -35,7 +35,6 @@ requerimientos_por_solicitud AS (
     GROUP BY id_solicitud
 ),
 
--- contar asignaciones generadas por cada solicitud
 asignaciones_por_solicitud AS (
     SELECT
         id_solicitud
@@ -45,7 +44,6 @@ asignaciones_por_solicitud AS (
     GROUP BY id_solicitud
 ),
 
--- enriquecer solicitudes
 solicitudes_enriched AS (
     SELECT
         r.id_solicitud
@@ -73,11 +71,20 @@ solicitudes_enriched AS (
         ON r.id_solicitud = req.id_solicitud
 ),
 
--- surrogate keys
+-- point-in-time lookup contra dim_empleado SCD2
+solicitudes_with_empleado AS (
+    SELECT
+        s.*
+        , {{ lookup_empleado_scd2('s.id_empleado', 's.fecha_inicio') }} AS empleado_key
+    FROM solicitudes_enriched s
+    LEFT JOIN {{ ref('dim_empleado') }} de
+        {{ join_empleado_scd2('s.id_empleado', 's.fecha_inicio') }}
+),
+
 final AS (
     SELECT
         {{ dbt_utils.generate_surrogate_key(['id_solicitud']) }} AS solicitud_key
-        , {{ dbt_utils.generate_surrogate_key(['id_empleado']) }} AS empleado_key_natural
+        , empleado_key
         , {{ dbt_utils.generate_surrogate_key(['fecha_inicio']) }} AS fecha_inicio_key
         , {{ dbt_utils.generate_surrogate_key(['fecha_fin']) }} AS fecha_fin_key
         -- degenerate dimensions
@@ -98,7 +105,7 @@ final AS (
         -- auditoría
         , fecha_creacion
         , fecha_actualizacion
-    FROM solicitudes_enriched
+    FROM solicitudes_with_empleado
 )
 
 SELECT * FROM final

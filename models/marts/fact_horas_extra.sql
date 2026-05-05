@@ -1,3 +1,4 @@
+
 {{
     config(
         materialized='incremental',
@@ -8,7 +9,6 @@
 
 WITH 
 
--- import CTEs
 stg_extra_hours AS (
     SELECT * FROM {{ ref('stg_bronze__extra_hours') }}
     {% if is_incremental() %}
@@ -24,7 +24,6 @@ stg_guards AS (
     SELECT * FROM {{ ref('stg_bronze__guards') }}
 ),
 
--- una guardia por fecha para obtener tipo_dia
 guards_per_date AS (
     SELECT
         fecha
@@ -41,7 +40,6 @@ guards_unique AS (
     WHERE rn = 1
 ),
 
--- JOIN horas extra con salarios y guardias + cálculo de costes
 horas_extra_enriched AS (
     SELECT
         eh.id_hora_extra
@@ -70,11 +68,20 @@ horas_extra_enriched AS (
         ON eh.fecha = g.fecha
 ),
 
--- surrogate keys como FK a dimensiones
+-- point-in-time lookup contra dim_empleado SCD2
+horas_extra_with_empleado AS (
+    SELECT
+        h.*
+        , {{ lookup_empleado_scd2('h.id_empleado', 'h.fecha') }} AS empleado_key
+    FROM horas_extra_enriched h
+    LEFT JOIN {{ ref('dim_empleado') }} de
+        {{ join_empleado_scd2('h.id_empleado', 'h.fecha') }}
+),
+
 final AS (
     SELECT
         {{ dbt_utils.generate_surrogate_key(['id_hora_extra']) }} AS horas_extra_key
-        , {{ dbt_utils.generate_surrogate_key(['id_empleado']) }} AS empleado_key_natural
+        , empleado_key                                                           -- ← versionada SCD2
         , {{ dbt_utils.generate_surrogate_key(['fecha']) }} AS fecha_key
         , {{ dbt_utils.generate_surrogate_key(['id_brigada_guardia']) }} AS brigada_key
         , {{ dbt_utils.generate_surrogate_key(['id_salario']) }} AS salario_key
@@ -98,7 +105,7 @@ final AS (
         -- auditoría
         , fecha_creacion
         , fecha_actualizacion
-    FROM horas_extra_enriched
+    FROM horas_extra_with_empleado
 )
 
 SELECT * FROM final
