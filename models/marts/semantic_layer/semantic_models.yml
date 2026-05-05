@@ -1,0 +1,132 @@
+semantic_models:
+  - name: horas_extra
+    model: ref('fact_horas_extra')
+    primary_entity: horas_extra
+    defaults:
+      agg_time_dimension: fecha
+    entities:
+      - name: horas_extra
+        type: primary
+        expr: horas_extra_key
+      - name: empleado
+        type: foreign
+        expr: empleado_key
+    dimensions:
+      - name: fecha
+        type: time
+        expr: fecha
+        type_params:
+          time_granularity: day
+      - name: tipo_dia
+        type: categorical
+        expr: tipo_dia
+      - name: tipo_salario
+        type: categorical
+        expr: tipo_salario
+    measures:
+      - name: coste_total
+        agg: sum
+        expr: coste_total
+      - name: coste_diurno
+        agg: sum
+        expr: coste_diurno
+      - name: coste_nocturno
+        agg: sum
+        expr: coste_nocturno
+      - name: total_horas
+        agg: sum
+        expr: total_horas
+      - name: bomberos_distintos
+        agg: count_distinct
+        expr: id_empleado
+
+  - name: solicitudes
+    model: ref('fact_solicitudes')
+    primary_entity: solicitud
+    defaults:
+      agg_time_dimension: fecha_inicio
+    entities:
+      - name: solicitud
+        type: primary
+        expr: solicitud_key
+      - name: empleado
+        type: foreign
+        expr: empleado_key
+    dimensions:
+      - name: fecha_inicio
+        type: time
+        expr: fecha_inicio
+        type_params:
+          time_granularity: day
+      - name: estado
+        type: categorical
+        expr: estado
+      - name: tipo_permiso
+        type: categorical
+        expr: tipo_permiso
+      - name: turno
+        type: categorical
+        expr: turno
+    measures:
+      - name: conteo_solicitudes
+        agg: count
+        expr: id_solicitud
+      - name: dias_solicitados
+        agg: sum
+        expr: dias_solicitados
+      - name: suma_asignaciones
+        agg: sum
+        expr: total_asignaciones_generadas
+      - name: suma_requerimientos
+        agg: sum
+        expr: total_requerimientos_generados
+
+  - name: incidencias
+    model: ref('fact_incidencias')
+    primary_entity: incidencia
+    defaults:
+      agg_time_dimension: fecha_incidencia
+    entities:
+      - name: incidencia
+        type: primary
+        expr: incidencia_key
+      - name: parque
+        type: foreign
+        expr: parque_key
+      - name: empleado_creador
+        type: foreign
+        expr: empleado_creador_key
+      - name: empleado_resolutor
+        type: foreign
+        expr: empleado_resolutor_key
+    dimensions:
+      - name: fecha_incidencia
+        type: time
+        expr: fecha_incidencia
+        type_params:
+          time_granularity: day
+      - name: estado
+        type: categorical
+        expr: estado
+      - name: nivel_gravedad
+        type: categorical
+        expr: nivel_gravedad
+      - name: tipo_incidencia
+        type: categorical
+        expr: tipo_incidencia
+    measures:
+      - name: total_incidencias
+        agg: count
+        expr: id_incidencia
+      - name: incidencias_resueltas
+        agg: sum
+        expr: es_resuelta
+      - name: incidencias_pendientes
+        agg: sum
+        expr: es_pendiente
+      - name: incidencias_tramitadas
+        agg: sum
+        expr: es_tramitada
+      - name: mttr_dias
+        agg: average
+        expr: dias_resolucion
