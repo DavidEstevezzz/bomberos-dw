@@ -1,0 +1,43 @@
+version: 2
+
+semantic_models:
+  - name: solicitudes
+    model: ref('fact_solicitudes')
+    primary_entity: solicitud
+    defaults:
+      agg_time_dimension: fecha_inicio
+    entities:
+      - name: solicitud
+        type: primary
+        expr: solicitud_key
+      - name: empleado
+        type: foreign
+        expr: empleado_key
+    dimensions:
+      - name: fecha_inicio
+        type: time
+        expr: fecha_inicio
+        type_params:
+          time_granularity: day
+      - name: estado
+        type: categorical
+        expr: estado
+      - name: tipo_permiso
+        type: categorical
+        expr: tipo_permiso
+      - name: turno
+        type: categorical
+        expr: turno
+    measures:
+      - name: conteo_solicitudes
+        agg: count
+        expr: id_solicitud
+      - name: dias_solicitados
+        agg: sum
+        expr: dias_solicitados
+      - name: suma_asignaciones
+        agg: sum
+        expr: total_asignaciones_generadas
+      - name: suma_requerimientos
+        agg: sum
+        expr: total_requerimientos_generados

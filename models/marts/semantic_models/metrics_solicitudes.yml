@@ -1,0 +1,38 @@
+version: 2
+
+metrics:
+  - name: m_total_solicitudes
+    type: simple
+    label: "Total de solicitudes"
+    type_params:
+      measure:
+        name: conteo_solicitudes
+
+  - name: m_solicitudes_confirmadas
+    type: simple
+    label: "Solicitudes confirmadas"
+    type_params:
+      measure:
+        name: conteo_solicitudes
+    filter: "{{ Dimension('estado') }} = 'confirmada'"
+
+  - name: m_tasa_aprobacion
+    type: ratio
+    label: "Tasa de aprobación"
+    type_params:
+      numerator: m_solicitudes_confirmadas
+      denominator: m_total_solicitudes
+
+  - name: m_total_requerimientos
+    type: simple
+    label: "Total de requerimientos"
+    type_params:
+      measure:
+        name: suma_requerimientos
+
+  - name: m_ratio_requerimientos_por_solicitud
+    type: ratio
+    label: "Requerimientos por solicitud"
+    type_params:
+      numerator: m_total_requerimientos
+      denominator: m_total_solicitudes
