@@ -214,14 +214,12 @@ models:
         data_tests:
           - unique
           - not_null
-
       - name: id_salario
         data_type: number(38,0)
         description: "Clave natural del salario."
         data_tests:
           - unique
           - not_null
-
       - name: tipo_salario
         data_type: varchar
         description: "Tipo de salario aplicado."
@@ -229,23 +227,18 @@ models:
           - accepted_values:
               arguments:
                 values: ['Subinspector', 'Tropa']
-
       - name: fecha_vigencia
         data_type: date
         description: "Fecha de inicio de vigencia de la tarifa."
-
       - name: precio_hora_diurna
         data_type: number(10,2)
         description: "Precio por hora diurna."
-
       - name: precio_hora_nocturna
         data_type: number(10,2)
         description: "Precio por hora nocturna."
-
       - name: horas_diurnas_jornada
         data_type: number(38,0)
         description: "Horas diurnas según tipo de día."
-
       - name: horas_nocturnas_jornada
         data_type: number(38,0)
         description: "Horas nocturnas según tipo de día."
@@ -354,6 +347,7 @@ models:
           - not_null
       - name: id_empleado
         data_type: number(38,0)
+        description: "ID natural del empleado en el OLTP."
         constraints:
           - type: not_null
         data_tests:
@@ -363,6 +357,7 @@ models:
         description: "Nombre anonimizado (BOMBERO_XXX)."
       - name: tipo_usuario
         data_type: varchar
+        description: "Tipo de usuario en la aplicación."
         data_tests:
           - accepted_values:
               arguments:
@@ -372,11 +367,11 @@ models:
         description: "Puesto operativo."
       - name: categoria_puesto
         data_type: varchar
+        description: "Categoría funcional del puesto."
         data_tests:
           - accepted_values:
               arguments:
                 values: ['Tropa', 'Mando', 'Administrativo', 'desconocido']
-
       - name: es_mando_especial
         data_type: boolean
         description: "TRUE si es mando especial."
@@ -394,7 +389,7 @@ models:
       - name: es_eliminado
         data_type: boolean
         description: "TRUE si el empleado fue dado de baja del sistema (hard delete detectado)."
-    
+
   - name: fact_horas_extra
     description: "Tabla de hechos de horas extra con costes calculados. Materialización incremental. FK empleado_key resuelta vía point-in-time lookup contra dim_empleado SCD2."
     config:
@@ -413,6 +408,43 @@ models:
         criticality: high
         grain: "una fila por id_hora_extra"
         sla: daily
+
+    semantic_model:
+      enabled: true
+      name: horas_extra
+
+    agg_time_dimension: fecha
+
+    metrics:
+      - name: coste_total_horas_extra
+        type: simple
+        label: "Coste total de horas extra"
+        agg: sum
+        expr: coste_total
+
+      - name: coste_diurno_horas_extra
+        type: simple
+        label: "Coste diurno de horas extra"
+        agg: sum
+        expr: coste_diurno
+
+      - name: coste_nocturno_horas_extra
+        type: simple
+        label: "Coste nocturno de horas extra"
+        agg: sum
+        expr: coste_nocturno
+
+      - name: total_horas_extra
+        type: simple
+        label: "Total de horas extra"
+        agg: sum
+        expr: total_horas
+
+      - name: bomberos_con_horas_extra
+        type: simple
+        label: "Bomberos distintos con horas extra"
+        agg: count_distinct
+        expr: id_empleado
 
     data_tests:
       - dbt_utils.expression_is_true:
@@ -434,19 +466,26 @@ models:
       - dbt_utils.expression_is_true:
           arguments:
             expression: "coste_total >= 0"
-
+    
     columns:
       - name: horas_extra_key
         data_type: varchar
         description: "Surrogate key del hecho."
+        entity:
+          name: horas_extra
+          type: primary
         constraints:
           - type: not_null
         data_tests:
           - unique
           - not_null
+
       - name: empleado_key
         data_type: varchar
         description: "FK a dim_empleado SCD2 — versión vigente en la fecha de la hora extra."
+        entity:
+          name: empleado
+          type: foreign
         constraints:
           - type: not_null
         data_tests:
@@ -455,6 +494,7 @@ models:
               arguments:
                 to: ref('dim_empleado')
                 field: empleado_key
+
       - name: fecha_key
         data_type: varchar
         description: "FK a dim_fecha."
@@ -463,61 +503,87 @@ models:
               arguments:
                 to: ref('dim_fecha')
                 field: fecha_key
+
       - name: brigada_key
         data_type: varchar
         description: "FK a dim_brigada de la guardia."
+        entity:
+          name: brigada
+          type: foreign
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_brigada')
                 field: brigada_key
+
       - name: salario_key
         data_type: varchar
         description: "FK a dim_salario."
+        entity:
+          name: salario
+          type: foreign
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_salario')
                 field: salario_key
+
       - name: id_hora_extra
         data_type: number(38,0)
         description: "Clave natural de la hora extra."
+
       - name: id_empleado
         data_type: number(38,0)
         description: "ID del bombero."
+
       - name: fecha
         data_type: date
         description: "Fecha de la hora extra."
+        granularity: day
+        dimension:
+          type: time
+
       - name: id_salario
         data_type: number(38,0)
         description: "ID del salario aplicado."
+
       - name: horas_diurnas
         data_type: number(38,0)
         description: "Horas diurnas realizadas."
+
       - name: horas_nocturnas
         data_type: number(38,0)
         description: "Horas nocturnas realizadas."
+
       - name: total_horas
         data_type: number(38,0)
         description: "Total de horas (diurnas + nocturnas)."
+
       - name: precio_hora_diurna
         data_type: number(10,2)
         description: "Precio por hora diurna según tarifa."
+
       - name: precio_hora_nocturna
         data_type: number(10,2)
         description: "Precio por hora nocturna según tarifa."
+
       - name: coste_diurno
         data_type: number(12,2)
         description: "Coste total diurno (horas × precio)."
+
       - name: coste_nocturno
         data_type: number(12,2)
         description: "Coste total nocturno (horas × precio)."
+
       - name: coste_total
         data_type: number(12,2)
         description: "Coste total de la hora extra (diurno + nocturno)."
+
       - name: tipo_dia
         data_type: varchar
         description: "Tipo de día asociado a la guardia: festivo, prefestivo, laborable o festivo víspera."
+        dimension:
+          type: categorical
         data_tests:
           - accepted_values:
               arguments:
@@ -526,18 +592,22 @@ models:
       - name: tipo_salario
         data_type: varchar
         description: "Tipo de tarifa salarial aplicada: Subinspector o Tropa."
+        dimension:
+          type: categorical
         data_tests:
           - accepted_values:
               arguments:
                 values: ['Subinspector', 'Tropa']
+
       - name: fecha_creacion
         data_type: timestamp_ntz
         description: "Fecha de creación del registro."
+
       - name: fecha_actualizacion
         data_type: timestamp_ntz
         description: "Fecha de última actualización."
-
-
+  
+    
   - name: fact_solicitudes
     description: "Tabla de hechos de solicitudes de permisos. FK empleado_key resuelta vía point-in-time lookup contra dim_empleado SCD2 con fecha_inicio como fecha de efecto."
     config:
@@ -556,6 +626,53 @@ models:
         criticality: high
         grain: "una fila por id_solicitud"
         sla: daily
+
+    semantic_model:
+      enabled: true
+      name: solicitudes
+
+    agg_time_dimension: fecha_inicio
+
+    metrics:
+      - name: total_solicitudes
+        type: simple
+        label: "Total de solicitudes"
+        agg: count
+        expr: id_solicitud
+
+      - name: solicitudes_confirmadas
+        type: simple
+        label: "Solicitudes confirmadas"
+        agg: count
+        expr: id_solicitud
+        filter: |
+          {{ Dimension('solicitud__estado') }} = 'confirmada'
+
+      - name: solicitudes_denegadas
+        type: simple
+        label: "Solicitudes denegadas"
+        agg: count
+        expr: id_solicitud
+        filter: |
+          {{ Dimension('solicitud__estado') }} = 'denegada'
+
+      - name: dias_ausencia_solicitados
+        type: simple
+        label: "Días de ausencia solicitados"
+        agg: sum
+        expr: dias_solicitados
+
+      - name: total_asignaciones_generadas
+        type: simple
+        label: "Total de asignaciones generadas"
+        agg: sum
+        expr: total_asignaciones_generadas
+
+      - name: total_requerimientos
+        type: simple
+        label: "Total de requerimientos"
+        agg: sum
+        expr: total_requerimientos_generados
 
     data_tests:
       - dbt_utils.expression_is_true:
@@ -580,14 +697,21 @@ models:
       - name: solicitud_key
         data_type: varchar
         description: "Surrogate key del hecho."
+        entity:
+          name: solicitud
+          type: primary
         constraints:
           - type: not_null
         data_tests:
           - unique
           - not_null
+
       - name: empleado_key
         data_type: varchar
         description: "FK a dim_empleado SCD2 — versión vigente en fecha_inicio del permiso."
+        entity:
+          name: empleado
+          type: foreign
         constraints:
           - type: not_null
         data_tests:
@@ -596,6 +720,7 @@ models:
               arguments:
                 to: ref('dim_empleado')
                 field: empleado_key
+
       - name: fecha_inicio_key
         data_type: varchar
         description: "FK a dim_fecha (fecha inicio permiso). Role-playing dimension."
@@ -605,6 +730,7 @@ models:
               arguments:
                 to: ref('dim_fecha')
                 field: fecha_key
+
       - name: fecha_fin_key
         data_type: varchar
         description: "FK a dim_fecha (fecha fin permiso). Role-playing dimension."
@@ -615,18 +741,24 @@ models:
                 field: fecha_key
               config:
                 where: "fecha_fin_key IS NOT NULL"
+
       - name: id_solicitud
         data_type: number(38,0)
         description: "Clave natural de la solicitud."
+
       - name: id_empleado
         data_type: number(38,0)
         description: "ID del bombero solicitante."
+
       - name: id_empleado_gestor
         data_type: number(38,0)
         description: "ID del gestor que tramita la solicitud."
+
       - name: tipo_permiso
         data_type: varchar
         description: "Tipo de permiso solicitado."
+        dimension:
+          type: categorical
         data_tests:
           - not_null
           - accepted_values:
@@ -641,38 +773,58 @@ models:
                   - 'licencias por dias'
                   - 'modulo'
                   - 'compensacion grupos especiales'
+
       - name: turno
         data_type: varchar
         description: "Turno afectado."
+        dimension:
+          type: categorical
+
       - name: estado
         data_type: varchar
         description: "Estado de la solicitud."
+        dimension:
+          type: categorical
         data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values: ['pendiente', 'confirmada', 'cancelada', 'denegada']
+
       - name: fecha_inicio
         data_type: date
         description: "Fecha de inicio del permiso."
+        granularity: day
+        dimension:
+          type: time
+
       - name: fecha_fin
         data_type: date
         description: "Fecha de fin del permiso."
+        granularity: day
+        dimension:
+          type: time
+
       - name: horas_solicitadas
         data_type: number(38,0)
         description: "Horas solicitadas (para salidas personales)."
+
       - name: dias_solicitados
         data_type: number(38,0)
         description: "Días de duración calculados (fecha_fin - fecha_inicio + 1)."
+
       - name: total_asignaciones_generadas
         data_type: number(38,0)
         description: "Número de asignaciones generadas por esta solicitud."
+
       - name: total_requerimientos_generados
         data_type: number(38,0)
         description: "Número de requerimientos forzados generados."
+
       - name: fecha_creacion
         data_type: timestamp_ntz
         description: "Fecha de creación."
+
       - name: fecha_actualizacion
         data_type: timestamp_ntz
         description: "Fecha de última actualización."
@@ -698,6 +850,43 @@ models:
         criticality: medium
         grain: "una fila por id_incidencia"
         sla: daily
+
+    semantic_model:
+      enabled: true
+      name: incidencias
+
+    agg_time_dimension: fecha_incidencia
+
+    metrics:
+      - name: total_incidencias
+        type: simple
+        label: "Total de incidencias"
+        agg: count
+        expr: id_incidencia
+
+      - name: incidencias_resueltas
+        type: simple
+        label: "Incidencias resueltas"
+        agg: sum
+        expr: es_resuelta
+
+      - name: incidencias_pendientes
+        type: simple
+        label: "Incidencias pendientes"
+        agg: sum
+        expr: es_pendiente
+
+      - name: incidencias_tramitadas
+        type: simple
+        label: "Incidencias tramitadas"
+        agg: sum
+        expr: es_tramitada
+
+      - name: mttr_dias
+        type: simple
+        label: "Tiempo medio de resolución en días"
+        agg: average
+        expr: dias_resolucion
 
     data_tests:
       - dbt_utils.expression_is_true:
@@ -726,14 +915,22 @@ models:
     columns:
       - name: incidencia_key
         data_type: varchar
+        description: "Surrogate key del hecho."
+        entity:
+          name: incidencia
+          type: primary
         constraints:
           - type: not_null
         data_tests:
           - unique
           - not_null
+
       - name: empleado_creador_key
         data_type: varchar
         description: "FK a dim_empleado SCD2 (rol: creador). Resuelto con fecha_incidencia."
+        entity:
+          name: empleado_creador
+          type: foreign
         constraints:
           - type: not_null
         data_tests:
@@ -742,9 +939,13 @@ models:
               arguments:
                 to: ref('dim_empleado')
                 field: empleado_key
+
       - name: empleado_resolutor_key
         data_type: varchar
         description: "FK a dim_empleado SCD2 (rol: resolutor). Resuelto con fecha_actualizacion si estado='resuelta'; '-1' en otro caso."
+        entity:
+          name: empleado_resolutor
+          type: foreign
         constraints:
           - type: not_null
         data_tests:
@@ -753,6 +954,7 @@ models:
               arguments:
                 to: ref('dim_empleado')
                 field: empleado_key
+
       - name: fecha_key
         data_type: varchar
         description: "FK a dim_fecha."
@@ -761,63 +963,98 @@ models:
               arguments:
                 to: ref('dim_fecha')
                 field: fecha_key
+
       - name: parque_key
         data_type: varchar
         description: "FK a dim_parque."
+        entity:
+          name: parque
+          type: foreign
         data_tests:
           - relationships:
               arguments:
                 to: ref('dim_parque')
                 field: parque_key
+
       - name: vehiculo_key
         data_type: varchar
         description: "FK a dim_vehiculo (solo si tipo=vehiculo)."
+        entity:
+          name: vehiculo
+          type: foreign
+
       - name: equipo_key
         data_type: varchar
         description: "FK a dim_equipo (solo si tipo=equipo)."
+        entity:
+          name: equipo
+          type: foreign
+
       - name: id_incidencia
         data_type: number(38,0)
         description: "Clave natural."
+
       - name: id_empleado_creador
         data_type: number(38,0)
         description: "ID del creador."
+
       - name: id_empleado_resolutor
         data_type: number(38,0)
         description: "ID del resolutor."
+
       - name: id_empleado_referenciado
         data_type: number(38,0)
         description: "ID del empleado referenciado (si tipo=personal)."
+
       - name: fecha_incidencia
         data_type: date
         description: "Fecha de la incidencia."
+        granularity: day
+        dimension:
+          type: time
+
       - name: id_parque
         data_type: number(38,0)
         description: "ID del parque."
+
       - name: matricula_vehiculo
         data_type: varchar
         description: "Matrícula tokenizada del vehículo."
+
       - name: id_equipo
         data_type: number(38,0)
         description: "ID del equipo personal."
+
       - name: nombre_equipo_comun
         data_type: varchar
         description: "Nombre del equipo común (texto libre)."
+
       - name: tipo_incidencia
         data_type: varchar
         description: "Tipo: vehiculo, personal, equipo, instalacion, vestuario, equipos_comunes."
+        dimension:
+          type: categorical
+
       - name: estado
         data_type: varchar
         description: "Estado: resuelta, tramitada, pendiente."
+        dimension:
+          type: categorical
+
       - name: nivel_gravedad
         data_type: varchar
         description: "Nivel: bajo, medio, alto."
+        dimension:
+          type: categorical
         data_tests:
           - accepted_values:
               arguments:
                 values: ['bajo', 'medio', 'alto', '']
+
       - name: esta_leido
         data_type: boolean
         description: "TRUE si la incidencia fue leída."
+
       - name: dias_resolucion
         data_type: number(38,0)
         description: "Días entre creación y resolución (solo para resueltas)."
@@ -827,22 +1064,26 @@ models:
                 expression: ">= 0"
               config:
                 where: "dias_resolucion IS NOT NULL"
+
       - name: es_resuelta
         data_type: number(38,0)
         description: "1 si está resuelta, 0 si no."
+
       - name: es_pendiente
         data_type: number(38,0)
         description: "1 si está pendiente, 0 si no."
+
       - name: es_tramitada
         data_type: number(38,0)
         description: "1 si está tramitada, 0 si no."
+
       - name: fecha_creacion
         data_type: timestamp_ntz
         description: "Fecha de creación."
+
       - name: fecha_actualizacion
         data_type: timestamp_ntz
         description: "Fecha de última actualización."
-
 
   - name: dim_time
     description: "Time spine diaria para MetricFlow. Una fila por día desde 2020 a 2030. Necesaria para resolución de granularidades y métricas cumulative."
@@ -855,16 +1096,62 @@ models:
         - dimension
         - shared
         - infrastructure
+
+    semantic_model:
+      enabled: true
+      name: dim_time
+
+    primary_entity: dim_time
+    agg_time_dimension: date_day
+
     time_spine:
       standard_granularity_column: date_day
+
     columns:
       - name: date_day
         data_type: date
         description: "Día calendario."
         granularity: day
+        dimension:
+          type: time
         constraints:
           - type: not_null
         data_tests:
           - unique
           - not_null
+    metrics:
+      - name: coste_medio_por_hora
+        type: ratio
+        label: "Coste medio por hora extra"
+        numerator: coste_total_horas_extra
+        denominator: total_horas_extra
 
+      - name: tasa_aprobacion
+        type: ratio
+        label: "Tasa de aprobación"
+        numerator: solicitudes_confirmadas
+        denominator: total_solicitudes
+
+      - name: tasa_denegacion
+        type: ratio
+        label: "Tasa de denegación"
+        numerator: solicitudes_denegadas
+        denominator: total_solicitudes
+
+      - name: ratio_requerimientos_por_solicitud
+        type: ratio
+        label: "Requerimientos por solicitud"
+        numerator: total_requerimientos
+        denominator: total_solicitudes
+
+      - name: tasa_resolucion
+        type: ratio
+        label: "Tasa de resolución"
+        numerator: incidencias_resueltas
+        denominator: total_incidencias
+
+      - name: tasa_pendientes
+        type: ratio
+        label: "Tasa de pendientes"
+        numerator: incidencias_pendientes
+        denominator: total_incidencias

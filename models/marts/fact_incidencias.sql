@@ -3,6 +3,7 @@
     config(
         materialized='incremental',
         unique_key='incidencia_key',
+        incremental_strategy='merge',
         on_schema_change='append_new_columns'
     )
 }}
@@ -12,7 +13,11 @@ WITH
 stg_incidents AS (
     SELECT * FROM {{ ref('stg_bronze__incidents') }}
     {% if is_incremental() %}
-        WHERE fecha_actualizacion > (SELECT MAX(fecha_actualizacion) FROM {{ this }})
+        WHERE fecha_actualizacion >= DATEADD(
+            day,
+            -{{ var('reprocess_days', 7) }},
+            (SELECT MAX(fecha_actualizacion) FROM {{ this }})
+        )
     {% endif %}
 ),
 
