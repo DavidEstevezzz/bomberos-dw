@@ -1,20 +1,26 @@
 version: 2
 
 models:
+
+  # ============================================================
+  # USERS
+  # ============================================================
   - name: stg_bronze__users
-    description: "Bomberos y mandos del cuerpo, con nombre tokenizado y categoría de puesto derivada."
+    description: >
+      Bomberos y mandos del cuerpo, con nombre tokenizado y categoría
+      de puesto derivada (Tropa / Mando / Administrativo).
     columns:
       - name: id_empleado
-        description: "Identificador único del bombero."
+        description: "Identificador único del bombero (PK)."
         data_tests:
           - unique
           - not_null
       - name: nombre_token
-        description: "Nombre anonimizado (BOMBERO_001, BOMBERO_002...)."
+        description: "Nombre anonimizado del bombero (BOMBERO_001, BOMBERO_002...)."
         data_tests:
           - not_null
       - name: tipo_usuario
-        description: "Rol en el sistema: jefe, mando, bombero, empleado."
+        description: "Rol en el sistema operativo: jefe, mando, bombero, empleado."
         data_tests:
           - accepted_values:
               arguments:
@@ -22,48 +28,89 @@ models:
       - name: puesto
         description: "Puesto operativo del bombero. NULL para usuarios administrativos."
       - name: categoria_puesto
-        description: "Categoría derivada: Tropa, Mando o Administrativo."
+        description: '{{ doc("categoria_puesto") }}'
         data_tests:
           - accepted_values:
               arguments:
                 values: ['Tropa', 'Mando', 'Administrativo', 'Desconocido']
+      - name: dias_vacaciones
+        description: "Contador de días de vacaciones disponibles. Volátil."
+        data_tests:
+          - not_null
+      - name: dias_asuntos_propios
+        description: "Contador de días de asuntos propios disponibles. Volátil."
+        data_tests:
+          - not_null
+      - name: es_mando_especial
+        description: "TRUE si tiene rol especial de mando (ej. coordinación de prácticas)."
+        data_tests:
+          - not_null
 
+  # ============================================================
+  # PARKS
+  # ============================================================
   - name: stg_bronze__parks
-    description: "Parques de bomberos de Granada."
+    description: "Parques de bomberos de Granada (Norte y Sur)."
     columns:
       - name: id_parque
+        description: "Identificador único del parque (PK)."
         data_tests:
           - unique
           - not_null
       - name: nombre_parque
+        description: "Nombre del parque (Parque Norte / Parque Sur)."
         data_tests:
           - not_null
 
+  # ============================================================
+  # BRIGADES
+  # ============================================================
   - name: stg_bronze__brigades
-    description: "Brigadas operativas y especiales con flag de brigada de servicio."
+    description: >
+      Brigadas operativas (A-F) y brigadas especiales (Vacaciones, Bajas,
+      Módulo, etc.). Las brigadas especiales no son operativas — sirven
+      como agrupador administrativo.
     columns:
       - name: id_brigada
+        description: "Identificador único de la brigada (PK)."
         data_tests:
           - unique
           - not_null
       - name: id_parque
+        description: "FK al parque al que pertenece la brigada."
         data_tests:
           - not_null
           - relationships:
               arguments:
                 to: ref('stg_bronze__parks')
                 field: id_parque
+      - name: nombre_brigada
+        description: "Letra/nombre de la brigada (A, B, C, D, E, F, Vacaciones, etc.)."
+        data_tests:
+          - not_null
       - name: es_brigada_servicio
-        description: "TRUE si es brigada operativa (A-F), FALSE si es especial (Vacaciones, Bajas, etc.)."
+        description: >
+          TRUE si es brigada operativa (A-F que cubren guardias).
+          FALSE si es brigada especial (Vacaciones, Bajas, Módulo, etc.).
+        data_tests:
+          - not_null
 
+  # ============================================================
+  # EXTRA HOURS
+  # ============================================================
   - name: stg_bronze__extra_hours
-    description: "Horas extra realizadas por bombero y día con total calculado."
+    description: >
+      Horas extra realizadas por bombero y día con total calculado.
+      Una fila por (id_empleado, fecha). Filtradas fechas previas a 2020
+      por presencia de datos corruptos en el origen.
     columns:
       - name: id_hora_extra
+        description: "Identificador único del registro de horas extra (PK)."
         data_tests:
           - unique
           - not_null
       - name: id_empleado
+        description: "FK al bombero que generó las horas extra."
         data_tests:
           - not_null
           - relationships:
@@ -71,44 +118,80 @@ models:
                 to: ref('stg_bronze__users')
                 field: id_empleado
       - name: id_salario
+        description: "FK a la tarifa salarial vigente."
         data_tests:
           - not_null
           - relationships:
               arguments:
                 to: ref('stg_bronze__salaries')
                 field: id_salario
+      - name: fecha
+        description: "Día en que se realizaron las horas extra."
+        data_tests:
+          - not_null
       - name: horas_diurnas
+        description: "Horas extra diurnas (06:00-22:00)."
         data_tests:
           - not_null
       - name: horas_nocturnas
+        description: "Horas extra nocturnas (22:00-06:00)."
         data_tests:
           - not_null
       - name: total_horas
-        description: "Suma de horas diurnas + nocturnas."
+        description: "Suma de horas diurnas + nocturnas. Campo derivado."
         data_tests:
           - not_null
 
+  # ============================================================
+  # SALARIES
+  # ============================================================
   - name: stg_bronze__salaries
-    description: "Tarifas salariales por tipo de puesto (Subinspector/Tropa) con precios hora diurna y nocturna."
+    description: >
+      Tarifas salariales por tipo de puesto (Subinspector / Tropa) con
+      precios por hora diurna y nocturna. Las tarifas tienen vigencia
+      temporal definida por fecha_inicio.
     columns:
       - name: id_salario
+        description: "Identificador único de la tarifa (PK)."
         data_tests:
           - unique
           - not_null
       - name: tipo_salario
+        description: "Categoría salarial: Subinspector o Tropa."
         data_tests:
+          - not_null
           - accepted_values:
               arguments:
                 values: ['Subinspector', 'Tropa']
+      - name: precio_hora_diurna
+        description: "Precio por hora extra diurna en euros."
+        data_tests:
+          - not_null
+      - name: precio_hora_nocturna
+        description: "Precio por hora extra nocturna en euros."
+        data_tests:
+          - not_null
 
+  # ============================================================
+  # GUARDS
+  # ============================================================
   - name: stg_bronze__guards
-    description: "Guardias diarias con brigada, parque, tipo de día y salario asociado."
+    description: >
+      Guardias diarias por brigada con tipo de día y salario asociado.
+      Una fila por (fecha, id_brigada). El tipo_dia determina el ratio
+      de horas diurnas/nocturnas aplicable.
     columns:
       - name: id_guardia
+        description: "Identificador único de la guardia (PK)."
         data_tests:
           - unique
           - not_null
+      - name: fecha
+        description: "Día de la guardia."
+        data_tests:
+          - not_null
       - name: id_brigada
+        description: "FK a la brigada que cubre la guardia."
         data_tests:
           - not_null
           - relationships:
@@ -116,4 +199,306 @@ models:
                 to: ref('stg_bronze__brigades')
                 field: id_brigada
       - name: tipo_dia
-        description: "Tipo de día: festivo, prefestivo, laborable, festivo víspera."
+        description: '{{ doc("tipo_dia") }}'
+
+  # ============================================================
+  # REQUESTS — solicitudes de permisos
+  # ============================================================
+  - name: stg_bronze__requests
+    description: >
+      Solicitudes de permisos del personal: vacaciones, asuntos propios,
+      módulo, salidas personales, horas sindicales, vestuario, licencias.
+      Filtradas fechas previas a 2020 (datos corruptos en origen).
+    columns:
+      - name: id_solicitud
+        description: "Identificador único de la solicitud (PK)."
+        data_tests:
+          - unique
+          - not_null
+      - name: id_empleado
+        description: "FK al bombero que solicita el permiso."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__users')
+                field: id_empleado
+      - name: id_empleado_gestor
+        description: "FK al jefe/mando que tramita la solicitud. Puede ser NULL si está pendiente."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__users')
+                field: id_empleado
+              config:
+                where: "id_empleado_gestor IS NOT NULL"
+      - name: tipo_permiso
+        description: '{{ doc("tipo_permiso") }}'
+        data_tests:
+          - not_null
+      - name: fecha_inicio
+        description: "Fecha de inicio del permiso solicitado."
+      - name: estado
+        description: '{{ doc("estado_solicitud") }}'
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['pendiente', 'confirmada', 'cancelada', 'denegada']
+      - name: turno
+        description: "Turno del permiso: Mañana, Tarde, Noche, Día completo."
+      - name: horas_solicitadas
+        description: "Horas solicitadas (para permisos de tipo horas)."
+        data_tests:
+          - not_null
+
+  # ============================================================
+  # SHIFT CHANGE REQUESTS — cambios de guardia
+  # ============================================================
+  - name: stg_bronze__shift_change_requests
+    description: >
+      Solicitudes de cambio de guardia entre dos bomberos con aprobación
+      de un tercero (mando). Se modelan dos fechas (cambio + espejo)
+      porque normalmente implican un intercambio simétrico.
+    columns:
+      - name: id_cambio
+        description: "Identificador único del cambio (PK)."
+        data_tests:
+          - unique
+          - not_null
+      - name: id_empleado_solicitante
+        description: "FK al bombero que solicita el cambio."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__users')
+                field: id_empleado
+      - name: id_empleado_receptor
+        description: "FK al bombero con el que se intercambia la guardia."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__users')
+                field: id_empleado
+      - name: id_empleado_aprobador
+        description: "FK al mando que aprueba el cambio. Puede ser NULL si está en trámite."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__users')
+                field: id_empleado
+              config:
+                where: "id_empleado_aprobador IS NOT NULL"
+      - name: fecha_cambio
+        description: "Fecha de la guardia que cede el solicitante."
+        data_tests:
+          - not_null
+      - name: estado
+        description: "Estado del cambio: rechazado, aceptado_por_empleados, en_tramite, aceptado."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['rechazado', 'aceptado_por_empleados', 'en_tramite', 'aceptado']
+      - name: turno
+        description: "Turno del cambio: mañana, tarde, noche, día completo."
+
+  # ============================================================
+  # FIREFIGHTERS ASSIGNMENTS — asignaciones operativas
+  # ============================================================
+  - name: stg_bronze__firefighters_assignments
+    description: >
+      Asignaciones operativas de bomberos: ida (cuando un bombero pasa de
+      su brigada habitual a otra por cobertura, requerimiento, traslado o
+      permiso) y vuelta (cuando regresa). Una solicitud puede generar
+      múltiples asignaciones (1 ida + 1 vuelta como mínimo).
+    columns:
+      - name: id_asignacion
+        description: "Identificador único de la asignación (PK)."
+        data_tests:
+          - unique
+          - not_null
+      - name: id_empleado
+        description: "FK al bombero asignado."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__users')
+                field: id_empleado
+      - name: id_brigada_origen
+        description: "FK a la brigada de origen del movimiento."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__brigades')
+                field: id_brigada
+              config:
+                where: "id_brigada_origen IS NOT NULL"
+      - name: id_brigada_destino
+        description: "FK a la brigada de destino del movimiento."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__brigades')
+                field: id_brigada
+      - name: id_solicitud
+        description: "FK a la solicitud que genera la asignación. NULL si es operativa pura."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__requests')
+                field: id_solicitud
+              config:
+                where: "id_solicitud IS NOT NULL"
+                severity: warn
+      - name: id_cambio_guardia
+        description: "FK al cambio de guardia que genera la asignación."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__shift_change_requests')
+                field: id_cambio
+              config:
+                where: "id_cambio_guardia IS NOT NULL"
+      - name: fecha_inicio
+        description: "Fecha de inicio del movimiento."
+        data_tests:
+          - not_null
+      - name: tipo_asignacion
+        description: "ida (movimiento hacia destino) / vuelta (regreso)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['ida', 'vuelta']
+      - name: es_requerimiento
+        description: "TRUE si la asignación es un requerimiento forzado por jefatura."
+        data_tests:
+          - not_null
+
+  # ============================================================
+  # INCIDENTS — incidencias
+  # ============================================================
+  - name: stg_bronze__incidents
+    description: >
+      Incidencias sobre vehículos, personal, equipos personales e
+      instalaciones. Campo derivado dias_resolucion calcula el lead time
+      entre creación y actualización para incidencias resueltas.
+    columns:
+      - name: id_incidencia
+        description: "Identificador único de la incidencia (PK)."
+        data_tests:
+          - unique
+          - not_null
+      - name: id_empleado_creador
+        description: "FK al bombero que abre la incidencia."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__users')
+                field: id_empleado
+      - name: id_empleado_resolutor
+        description: "FK al bombero que resuelve la incidencia. NULL si no está resuelta."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__users')
+                field: id_empleado
+              config:
+                where: "id_empleado_resolutor IS NOT NULL"
+      - name: tipo_incidencia
+        description: "Tipo de incidencia (vehículos, personal, equipos, instalaciones, etc.)."
+        data_tests:
+          - not_null
+      - name: estado
+        description: "Estado de la incidencia: pendiente, tramitada, resuelta."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['pendiente', 'tramitada', 'resuelta']
+      - name: nivel_gravedad
+        description: "Nivel de gravedad: bajo, medio, alto. Vacío en algunas filas históricas."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['bajo', 'medio', 'alto', '']
+      - name: id_parque
+        description: "FK al parque donde ocurre la incidencia."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__parks')
+                field: id_parque
+      - name: fecha_incidencia
+        description: "Fecha en que ocurre la incidencia."
+      - name: dias_resolucion
+        description: >
+          Días entre creación y resolución. Solo calculado si la incidencia está
+          resuelta y las fechas son consistentes (entre 0 y 3650 días).
+          Defensivo contra timestamps corruptos del origen.
+
+  # ============================================================
+  # VEHICLES
+  # ============================================================
+  - name: stg_bronze__vehicles
+    description: "Vehículos del cuerpo. Matrícula tokenizada (VEHICULO_XXX)."
+    columns:
+      - name: matricula_token
+        description: "Matrícula anonimizada del vehículo (PK lógica)."
+        data_tests:
+          - unique
+          - not_null
+      - name: nombre_vehiculo
+        description: "Nombre operativo del vehículo (BUL-1, AEA-2, etc.)."
+        data_tests:
+          - not_null
+      - name: id_parque
+        description: "FK al parque donde está estacionado."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__parks')
+                field: id_parque
+              config:
+                where: "id_parque IS NOT NULL"
+      - name: tipo_vehiculo
+        description: "Tipo operativo: bomba urbana, autoescalera, ambulancia, etc."
+
+  # ============================================================
+  # EQUIPOS PERSONALES
+  # ============================================================
+  - name: stg_bronze__equipos_personales
+    description: >
+      Equipos personales asignables (radios, linternas, PTT, máscaras,
+      ropa de intervención, etc.). Pueden ser objeto de incidencias.
+    columns:
+      - name: id_equipo
+        description: "Identificador único del equipo (PK)."
+        data_tests:
+          - unique
+          - not_null
+      - name: nombre_equipo
+        description: "Identificador operativo del equipo."
+        data_tests:
+          - not_null
+      - name: categoria_equipo
+        description: "Categoría del equipo (radios, linternas, etc.)."
+      - name: esta_disponible
+        description: "TRUE si el equipo está operativo y disponible para asignación."
+        data_tests:
+          - not_null
+      - name: id_parque
+        description: "FK al parque donde está asignado el equipo."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_bronze__parks')
+                field: id_parque
+              config:
+                where: "id_parque IS NOT NULL"

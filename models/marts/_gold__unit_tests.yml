@@ -1,0 +1,126 @@
+version: 2
+
+unit_tests:
+  # ============================================================
+  # FACT_HORAS_EXTRA — cálculo de costes
+  # ============================================================
+  - name: test_coste_total_tropa_laborable
+    description: >
+      Bombero de Tropa con 8h diurnas + 4h nocturnas en día laborable.
+      Precio Tropa: 20€/h diurna, 30€/h nocturna.
+      Coste esperado: 8*20 + 4*30 = 160 + 120 = 280€.
+    model: fact_horas_extra
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: ref('stg_bronze__extra_hours')
+        rows:
+          - { id_hora_extra: 1, id_empleado: 100, id_salario: 1, fecha: '2024-06-15', horas_diurnas: 8, horas_nocturnas: 4, total_horas: 12, fecha_creacion: '2024-06-15 00:00:00', fecha_actualizacion: '2024-06-15 00:00:00' }
+
+      - input: ref('stg_bronze__salaries')
+        rows:
+          - { id_salario: 1, tipo_salario: 'Tropa', precio_hora_diurna: 20.00, precio_hora_nocturna: 30.00, fecha_vigencia: '2024-01-01' }
+
+      - input: ref('stg_bronze__guards')
+        rows:
+          - { id_guardia: 999, fecha: '2024-06-15', id_brigada: 5, id_parque: 1, id_salario: 1, tipo_dia: 'laborable' }
+
+      - input: ref('dim_empleado')
+        rows:
+          - { empleado_key: 'EMP_KEY_100', id_empleado: 100, nombre_token: 'BOMBERO_100', tipo_usuario: 'bombero', puesto: 'Bombero', categoria_puesto: 'Tropa', es_mando_especial: false, fecha_inicio_validez: '2020-01-01 00:00:00', fecha_fin_validez: null, es_version_actual: true, es_eliminado: false }
+
+    expect:
+      rows:
+        - { id_hora_extra: 1, coste_diurno: 160.00, coste_nocturno: 120.00, coste_total: 280.00, tipo_salario: 'Tropa', tipo_dia: 'laborable' }
+
+  - name: test_coste_total_subinspector_festivo
+    description: >
+      Subinspector con 2h diurnas + 22h nocturnas en festivo.
+      Precio Subinspector: 30€/h diurna, 45€/h nocturna.
+      Coste esperado: 2*30 + 22*45 = 60 + 990 = 1050€.
+    model: fact_horas_extra
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: ref('stg_bronze__extra_hours')
+        rows:
+          - { id_hora_extra: 2, id_empleado: 200, id_salario: 2, fecha: '2024-12-25', horas_diurnas: 2, horas_nocturnas: 22, total_horas: 24, fecha_creacion: '2024-12-25 00:00:00', fecha_actualizacion: '2024-12-25 00:00:00' }
+
+      - input: ref('stg_bronze__salaries')
+        rows:
+          - { id_salario: 2, tipo_salario: 'Subinspector', precio_hora_diurna: 30.00, precio_hora_nocturna: 45.00, fecha_vigencia: '2024-01-01' }
+
+      - input: ref('stg_bronze__guards')
+        rows:
+          - { id_guardia: 1000, fecha: '2024-12-25', id_brigada: 5, id_parque: 1, id_salario: 2, tipo_dia: 'festivo' }
+
+      - input: ref('dim_empleado')
+        rows:
+          - { empleado_key: 'EMP_KEY_200', id_empleado: 200, nombre_token: 'BOMBERO_200', tipo_usuario: 'mando', puesto: 'Subinspector', categoria_puesto: 'Mando', es_mando_especial: false, fecha_inicio_validez: '2020-01-01 00:00:00', fecha_fin_validez: null, es_version_actual: true, es_eliminado: false }
+
+    expect:
+      rows:
+        - { id_hora_extra: 2, coste_diurno: 60.00, coste_nocturno: 990.00, coste_total: 1050.00, tipo_salario: 'Subinspector', tipo_dia: 'festivo' }
+
+  # ============================================================
+  # STG_BRONZE__USERS — clasificación de puesto
+  # ============================================================
+  - name: test_categoria_puesto_clasificacion
+    description: >
+      Validar la lógica del CASE WHEN que clasifica el puesto operativo
+      en categorías: Tropa (Conductor/Operador/Bombero), Mando
+      (Subinspector/Oficial), Administrativo (puesto NULL), o Desconocido.
+    model: stg_bronze__users
+    given:
+      - input: source('bronze', 'users')
+        rows:
+          - { ID_EMPLEADO: 1, NOMBRE: 'BOMBERO_001', TYPE: 'bombero', PUESTO: 'Conductor', AP: 0, VACACIONES: 0, MODULO: 0, SP: 0, COMPENSACION_GRUPOS: 0, HORAS_SINDICALES: 0, MANDO_ESPECIAL: false, CREATED_AT: '2024-01-01 00:00:00', UPDATED_AT: '2024-01-01 00:00:00', _LOADED_AT: '2024-01-01 00:00:00' }
+          - { ID_EMPLEADO: 2, NOMBRE: 'BOMBERO_002', TYPE: 'bombero', PUESTO: 'Operador', AP: 0, VACACIONES: 0, MODULO: 0, SP: 0, COMPENSACION_GRUPOS: 0, HORAS_SINDICALES: 0, MANDO_ESPECIAL: false, CREATED_AT: '2024-01-01 00:00:00', UPDATED_AT: '2024-01-01 00:00:00', _LOADED_AT: '2024-01-01 00:00:00' }
+          - { ID_EMPLEADO: 3, NOMBRE: 'BOMBERO_003', TYPE: 'bombero', PUESTO: 'Bombero', AP: 0, VACACIONES: 0, MODULO: 0, SP: 0, COMPENSACION_GRUPOS: 0, HORAS_SINDICALES: 0, MANDO_ESPECIAL: false, CREATED_AT: '2024-01-01 00:00:00', UPDATED_AT: '2024-01-01 00:00:00', _LOADED_AT: '2024-01-01 00:00:00' }
+          - { ID_EMPLEADO: 4, NOMBRE: 'BOMBERO_004', TYPE: 'mando', PUESTO: 'Subinspector', AP: 0, VACACIONES: 0, MODULO: 0, SP: 0, COMPENSACION_GRUPOS: 0, HORAS_SINDICALES: 0, MANDO_ESPECIAL: false, CREATED_AT: '2024-01-01 00:00:00', UPDATED_AT: '2024-01-01 00:00:00', _LOADED_AT: '2024-01-01 00:00:00' }
+          - { ID_EMPLEADO: 5, NOMBRE: 'BOMBERO_005', TYPE: 'mando', PUESTO: 'Oficial', AP: 0, VACACIONES: 0, MODULO: 0, SP: 0, COMPENSACION_GRUPOS: 0, HORAS_SINDICALES: 0, MANDO_ESPECIAL: false, CREATED_AT: '2024-01-01 00:00:00', UPDATED_AT: '2024-01-01 00:00:00', _LOADED_AT: '2024-01-01 00:00:00' }
+          - { ID_EMPLEADO: 6, NOMBRE: 'BOMBERO_006', TYPE: 'empleado', PUESTO: null, AP: 0, VACACIONES: 0, MODULO: 0, SP: 0, COMPENSACION_GRUPOS: 0, HORAS_SINDICALES: 0, MANDO_ESPECIAL: false, CREATED_AT: '2024-01-01 00:00:00', UPDATED_AT: '2024-01-01 00:00:00', _LOADED_AT: '2024-01-01 00:00:00' }
+          - { ID_EMPLEADO: 7, NOMBRE: 'BOMBERO_007', TYPE: 'bombero', PUESTO: 'Coordinador', AP: 0, VACACIONES: 0, MODULO: 0, SP: 0, COMPENSACION_GRUPOS: 0, HORAS_SINDICALES: 0, MANDO_ESPECIAL: false, CREATED_AT: '2024-01-01 00:00:00', UPDATED_AT: '2024-01-01 00:00:00', _LOADED_AT: '2024-01-01 00:00:00' }
+
+    expect:
+      rows:
+        - { id_empleado: 1, categoria_puesto: 'Tropa' }
+        - { id_empleado: 2, categoria_puesto: 'Tropa' }
+        - { id_empleado: 3, categoria_puesto: 'Tropa' }
+        - { id_empleado: 4, categoria_puesto: 'Mando' }
+        - { id_empleado: 5, categoria_puesto: 'Mando' }
+        - { id_empleado: 6, categoria_puesto: 'Administrativo' }
+        - { id_empleado: 7, categoria_puesto: 'Desconocido' }
+
+  # ============================================================
+  # FACT_INCIDENCIAS — flags de estado
+  # ============================================================
+  - name: test_flags_estado_mutuamente_excluyentes
+    description: >
+      Validar que los flags es_resuelta / es_pendiente / es_tramitada
+      son mutuamente excluyentes y consistentes con el estado.
+      Una incidencia siempre debe tener exactamente un flag activo.
+    model: fact_incidencias
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: ref('stg_bronze__incidents')
+        rows:
+          - { id_incidencia: 1, id_empleado_creador: 100, tipo_incidencia: 'vehiculos', estado: 'resuelta', nivel_gravedad: 'medio', fecha_incidencia: '2024-06-01', id_parque: 1, matricula_vehiculo: null, id_empleado_referenciado: null, id_equipo: null, id_empleado_resolutor: 200, esta_leido: true, nombre_equipo_comun: null, fecha_creacion: '2024-06-01 00:00:00', fecha_actualizacion: '2024-06-05 00:00:00', dias_resolucion: 4 }
+          - { id_incidencia: 2, id_empleado_creador: 100, tipo_incidencia: 'personal', estado: 'pendiente', nivel_gravedad: 'bajo', fecha_incidencia: '2024-06-10', id_parque: 1, matricula_vehiculo: null, id_empleado_referenciado: null, id_equipo: null, id_empleado_resolutor: null, esta_leido: false, nombre_equipo_comun: null, fecha_creacion: '2024-06-10 00:00:00', fecha_actualizacion: '2024-06-10 00:00:00', dias_resolucion: null }
+          - { id_incidencia: 3, id_empleado_creador: 100, tipo_incidencia: 'instalaciones', estado: 'tramitada', nivel_gravedad: 'alto', fecha_incidencia: '2024-06-15', id_parque: 2, matricula_vehiculo: null, id_empleado_referenciado: null, id_equipo: null, id_empleado_resolutor: null, esta_leido: true, nombre_equipo_comun: null, fecha_creacion: '2024-06-15 00:00:00', fecha_actualizacion: '2024-06-16 00:00:00', dias_resolucion: null }
+
+      - input: ref('dim_empleado')
+        rows:
+          - { empleado_key: 'EMP_100', id_empleado: 100, nombre_token: 'BOMBERO_100', tipo_usuario: 'bombero', puesto: 'Bombero', categoria_puesto: 'Tropa', es_mando_especial: false, fecha_inicio_validez: '2020-01-01 00:00:00', fecha_fin_validez: null, es_version_actual: true, es_eliminado: false }
+          - { empleado_key: 'EMP_200', id_empleado: 200, nombre_token: 'BOMBERO_200', tipo_usuario: 'mando', puesto: 'Subinspector', categoria_puesto: 'Mando', es_mando_especial: false, fecha_inicio_validez: '2020-01-01 00:00:00', fecha_fin_validez: null, es_version_actual: true, es_eliminado: false }
+          - { empleado_key: '-1', id_empleado: -1, nombre_token: 'DESCONOCIDO', tipo_usuario: 'desconocido', puesto: 'desconocido', categoria_puesto: 'desconocido', es_mando_especial: false, fecha_inicio_validez: '1900-01-01 00:00:00', fecha_fin_validez: null, es_version_actual: true, es_eliminado: false }
+
+    expect:
+      rows:
+        - { id_incidencia: 1, estado: 'resuelta', es_resuelta: 1, es_pendiente: 0, es_tramitada: 0 }
+        - { id_incidencia: 2, estado: 'pendiente', es_resuelta: 0, es_pendiente: 1, es_tramitada: 0 }
+        - { id_incidencia: 3, estado: 'tramitada', es_resuelta: 0, es_pendiente: 0, es_tramitada: 1 }
