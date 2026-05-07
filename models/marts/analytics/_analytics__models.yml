@@ -1,0 +1,443 @@
+version: 2
+
+models: 
+  - name: presion_operativa_diaria
+    description: >
+      Modelo analítico diario que cruza permisos activos confirmados con
+      requerimientos operativos. Una fila por día. Permite estudiar la relación
+      entre volumen de permisos activos y requerimientos forzados para detectar
+      umbrales de presión operativa.
+    config:
+      contract:
+        enforced: true
+      group: personal
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_personal
+        - dominio_operativo
+        - presentation_portfolio
+      meta:
+        owner: "Equipo de Datos - Bomberos Granada"
+        domain: operativa
+        criticality: medium
+        grain: "una fila por fecha"
+        use_case: "presion_operativa_permisos_vs_requerimientos"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "permisos_activos_total >= 0"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "requerimientos_total >= 0"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "requerimientos_por_permiso_activo >= 0"
+          config:
+            where: "requerimientos_por_permiso_activo IS NOT NULL"
+
+    columns:
+      - name: fecha
+        data_type: date
+        description: "Día analizado. Grano del modelo."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+
+      - name: tipo_dia
+        data_type: varchar
+        description: "Tipo operativo del día procedente de dim_fecha."
+
+      - name: permisos_activos_total
+        data_type: number(38,0)
+        description: "Número total de solicitudes confirmadas activas en ese día."
+
+      - name: permisos_vacaciones
+        data_type: number(38,0)
+        description: "Número de permisos activos de tipo vacaciones."
+
+      - name: permisos_asuntos_propios
+        data_type: number(38,0)
+        description: "Número de permisos activos de tipo asuntos propios."
+
+      - name: permisos_horas_sindicales
+        data_type: number(38,0)
+        description: "Número de permisos activos de tipo horas sindicales."
+
+      - name: permisos_salidas_personales
+        data_type: number(38,0)
+        description: "Número de permisos activos de tipo salidas personales."
+
+      - name: permisos_vestuario
+        data_type: number(38,0)
+        description: "Número de permisos activos de tipo vestuario."
+
+      - name: permisos_licencias_jornadas
+        data_type: number(38,0)
+        description: "Número de permisos activos de tipo licencias por jornadas."
+
+      - name: permisos_licencias_dias
+        data_type: number(38,0)
+        description: "Número de permisos activos de tipo licencias por días."
+
+      - name: permisos_modulo
+        data_type: number(38,0)
+        description: "Número de permisos activos de tipo módulo."
+
+      - name: permisos_compensacion_grupos
+        data_type: number(38,0)
+        description: "Número de permisos activos de tipo compensación de grupos especiales."
+
+      - name: requerimientos_total
+        data_type: number(38,0)
+        description: "Número total de requerimientos forzados registrados ese día."
+
+      - name: bomberos_requeridos
+        data_type: number(38,0)
+        description: "Número de bomberos distintos requeridos ese día."
+
+      - name: requerimientos_por_permiso_activo
+        data_type: number(38,3)
+        description: "Ratio de requerimientos por permiso activo en el día."
+
+      - name: requerimientos_por_100_permisos_activos
+        data_type: number(38,2)
+        description: "Requerimientos estimados por cada 100 permisos activos."
+
+      - name: tramo_permisos_activos
+        data_type: varchar
+        description: "Agrupación del número de permisos activos para análisis de umbrales."
+
+      - name: hubo_requerimientos
+        data_type: boolean
+        description: "TRUE si ese día hubo al menos un requerimiento."
+  - name: solicitudes_gestion_tipo_permiso
+    description: >
+      Modelo analítico agregado por tipo de permiso para el periodo 2026-01-01
+      a 2026-05-05. Permite analizar volumen, tasas de confirmación,
+      denegación, cancelación, días solicitados y antelación media de aprobación.
+    config:
+      contract:
+        enforced: true
+      group: personal
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_personal
+        - presentation_portfolio
+      meta:
+        owner: "Recursos Humanos - Bomberos Granada"
+        domain: personal
+        criticality: medium
+        grain: "una fila por tipo_permiso"
+        use_case: "gestion_administrativa_solicitudes"
+
+    columns:
+      - name: tipo_permiso
+        data_type: varchar
+        description: "Tipo de permiso solicitado."
+        data_tests:
+          - unique
+          - not_null
+
+      - name: total_solicitudes
+        data_type: number(38,0)
+        description: "Número total de solicitudes del tipo en el periodo."
+
+      - name: solicitudes_confirmadas
+        data_type: number(38,0)
+        description: "Número de solicitudes confirmadas."
+
+      - name: solicitudes_denegadas
+        data_type: number(38,0)
+        description: "Número de solicitudes denegadas."
+
+      - name: solicitudes_canceladas
+        data_type: number(38,0)
+        description: "Número de solicitudes canceladas."
+
+      - name: solicitudes_pendientes
+        data_type: number(38,0)
+        description: "Número de solicitudes pendientes."
+
+      - name: pct_confirmadas
+        data_type: number(38,2)
+        description: "Porcentaje de solicitudes confirmadas."
+
+      - name: pct_denegadas
+        data_type: number(38,2)
+        description: "Porcentaje de solicitudes denegadas."
+
+      - name: pct_canceladas
+        data_type: number(38,2)
+        description: "Porcentaje de solicitudes canceladas."
+
+      - name: total_dias_solicitados
+        data_type: number(38,0)
+        description: "Total de días solicitados."
+
+      - name: dias_confirmados
+        data_type: number(38,0)
+        description: "Total de días confirmados."
+
+      - name: dias_denegados
+        data_type: number(38,0)
+        description: "Total de días denegados."
+
+      - name: media_dias_antelacion_aprobacion
+        data_type: number(38,2)
+        description: "Media de días de antelación con que se aprueban las solicitudes confirmadas."
+
+      - name: mediana_dias_antelacion_aprobacion
+        data_type: number(38,2)
+        description: "Mediana de días de antelación con que se aprueban las solicitudes confirmadas."
+
+      - name: aprobadas_despues_inicio
+        data_type: number(38,0)
+        description: "Solicitudes confirmadas después de la fecha de inicio."
+
+      - name: aprobadas_con_0_2_dias_antelacion
+        data_type: number(38,0)
+        description: "Solicitudes confirmadas entre 0 y 2 días antes del inicio."
+  - name: solicitudes_estacionalidad
+    description: >
+      Modelo analítico mensual para estudiar la estacionalidad de las solicitudes
+      de permisos. Una fila por mes y tipo de permiso. Permite detectar meses
+      con mayor concentración de solicitudes, días solicitados y días confirmados.
+    config:
+      contract:
+        enforced: true
+      group: personal
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_personal
+        - presentation_portfolio
+      meta:
+        owner: "Recursos Humanos - Bomberos Granada"
+        domain: personal
+        criticality: medium
+        grain: "una fila por mes y tipo_permiso"
+        use_case: "estacionalidad_permisos"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_solicitudes >= 0"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "solicitudes_confirmadas + solicitudes_denegadas + solicitudes_canceladas + solicitudes_pendientes = total_solicitudes"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_dias_solicitados >= dias_confirmados"
+
+    columns:
+      - name: mes
+        data_type: date
+        description: "Mes de inicio de las solicitudes."
+        constraints:
+          - type: not_null
+        data_tests:
+          - not_null
+
+      - name: tipo_permiso
+        data_type: varchar
+        description: "Tipo de permiso solicitado."
+        constraints:
+          - type: not_null
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'vacaciones'
+                  - 'asuntos propios'
+                  - 'horas sindicales'
+                  - 'salidas personales'
+                  - 'vestuario'
+                  - 'licencias por jornadas'
+                  - 'licencias por dias'
+                  - 'modulo'
+                  - 'compensacion grupos especiales'
+
+      - name: total_solicitudes
+        data_type: number(38,0)
+        description: "Número total de solicitudes del mes y tipo de permiso."
+
+      - name: empleados_distintos
+        data_type: number(38,0)
+        description: "Número de empleados distintos que realizaron solicitudes de ese tipo en el mes."
+
+      - name: solicitudes_confirmadas
+        data_type: number(38,0)
+        description: "Número de solicitudes confirmadas."
+
+      - name: solicitudes_denegadas
+        data_type: number(38,0)
+        description: "Número de solicitudes denegadas."
+
+      - name: solicitudes_canceladas
+        data_type: number(38,0)
+        description: "Número de solicitudes canceladas."
+
+      - name: solicitudes_pendientes
+        data_type: number(38,0)
+        description: "Número de solicitudes pendientes."
+
+      - name: total_dias_solicitados
+        data_type: number(38,0)
+        description: "Total de días solicitados."
+
+      - name: dias_confirmados
+        data_type: number(38,0)
+        description: "Total de días correspondientes a solicitudes confirmadas."
+
+      - name: dias_denegados
+        data_type: number(38,0)
+        description: "Total de días correspondientes a solicitudes denegadas."
+
+      - name: media_dias_por_solicitud
+        data_type: number(38,2)
+        description: "Media de días solicitados por solicitud."
+  - name: solicitudes_ranking_empleados
+    description: >
+      Modelo analítico para analizar la concentración de solicitudes y días de
+      ausencia por empleado tokenizado. Una fila por empleado. Agrega todos los
+      tipos de permiso del periodo analizado y permite ordenar por días
+      solicitados, confirmados, denegados, cancelados o pendientes.
+    config:
+      contract:
+        enforced: true
+      group: personal
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_personal
+        - scd2
+        - presentation_portfolio
+      meta:
+        owner: "Recursos Humanos - Bomberos Granada"
+        domain: personal
+        criticality: medium
+        grain: "una fila por empleado"
+        use_case: "ranking_empleados_dias_solicitados"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_solicitudes >= 0"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "solicitudes_confirmadas + solicitudes_denegadas + solicitudes_canceladas + solicitudes_pendientes = total_solicitudes"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_dias_solicitados >= dias_confirmados"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_dias_solicitados >= dias_denegados"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_dias_solicitados >= dias_cancelados"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_dias_solicitados >= dias_pendientes"
+
+    columns:
+      - name: id_empleado
+        data_type: number(38,0)
+        description: "ID natural del empleado solicitante."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+
+      - name: nombre_token
+        data_type: varchar
+        description: "Nombre anonimizado/tokenizado del empleado."
+
+      - name: categoria_puesto
+        data_type: varchar
+        description: "Categoría histórica del puesto del empleado en el momento de las solicitudes."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Tropa', 'Mando', 'Administrativo', 'desconocido']
+
+      - name: puesto
+        data_type: varchar
+        description: "Puesto histórico del empleado en el momento de las solicitudes."
+
+      - name: total_solicitudes
+        data_type: number(38,0)
+        description: "Número total de solicitudes del empleado en el periodo analizado."
+
+      - name: solicitudes_confirmadas
+        data_type: number(38,0)
+        description: "Número de solicitudes confirmadas del empleado."
+
+      - name: solicitudes_denegadas
+        data_type: number(38,0)
+        description: "Número de solicitudes denegadas del empleado."
+
+      - name: solicitudes_canceladas
+        data_type: number(38,0)
+        description: "Número de solicitudes canceladas del empleado."
+
+      - name: solicitudes_pendientes
+        data_type: number(38,0)
+        description: "Número de solicitudes pendientes del empleado."
+
+      - name: total_dias_solicitados
+        data_type: number(38,0)
+        description: "Total de días solicitados por el empleado."
+
+      - name: dias_confirmados
+        data_type: number(38,0)
+        description: "Total de días correspondientes a solicitudes confirmadas."
+
+      - name: dias_denegados
+        data_type: number(38,0)
+        description: "Total de días correspondientes a solicitudes denegadas."
+
+      - name: dias_cancelados
+        data_type: number(38,0)
+        description: "Total de días correspondientes a solicitudes canceladas."
+
+      - name: dias_pendientes
+        data_type: number(38,0)
+        description: "Total de días correspondientes a solicitudes pendientes."
+
+      - name: pct_confirmadas
+        data_type: number(38,2)
+        description: "Porcentaje de solicitudes confirmadas sobre el total del empleado."
+
+      - name: pct_denegadas
+        data_type: number(38,2)
+        description: "Porcentaje de solicitudes denegadas sobre el total del empleado."
+
+      - name: media_dias_por_solicitud
+        data_type: number(38,2)
+        description: "Media de días solicitados por solicitud del empleado."
+
+      - name: tipos_permiso_distintos
+        data_type: number(38,0)
+        description: "Número de tipos de permiso distintos solicitados por el empleado."
+
+      - name: tipos_permiso_usados
+        data_type: varchar
+        description: "Listado de tipos de permiso solicitados por el empleado en el periodo."

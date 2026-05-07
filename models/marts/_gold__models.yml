@@ -302,21 +302,24 @@ models:
           - accepted_values:
               arguments:
                 values: ['festivo', 'prefestivo', 'laborable', 'fin de semana', 'festivo víspera']
+      - name: sin_datos_guardia
+        data_type: boolean
+        description: "TRUE si no hay registro de guardia para esta fecha. Útil para auditoría de calidad de dato."
       - name: es_festivo
         data_type: boolean
         description: "TRUE si tipo_dia='festivo'."
       - name: es_prefestivo
         data_type: boolean
-        description: "TRUE si tipo_dia='prefestivo' o 'festivo víspera'."
+        description: "TRUE si tipo_dia='prefestivo'."
+      - name: es_festivo_vispera
+        data_type: boolean
+        description: "TRUE si tipo_dia='festivo víspera' (festivo que además es víspera de otro festivo)."
       - name: es_laborable
         data_type: boolean
         description: "TRUE si es laborable (incluye días L-V sin info de guardia)."
       - name: es_fin_de_semana
         data_type: boolean
-        description: "TRUE si es sábado o domingo."
-      - name: sin_datos_guardia
-        data_type: boolean
-        description: "TRUE si no hay registro de guardia para esta fecha. Útil para auditoría de calidad de dato."
+        description: "TRUE si tipo_dia='fin de semana'."
 
   - name: dim_empleado
     description: "Dimensión de empleados SCD Tipo 2. Cada cambio de puesto o rol genera una nueva versión."
@@ -828,7 +831,185 @@ models:
       - name: fecha_actualizacion
         data_type: timestamp_ntz
         description: "Fecha de última actualización."
+  - name: fact_asignaciones_operativas
+    description: >
+      Tabla de hechos de asignaciones operativas de bomberos. Una fila por
+      asignación. Permite analizar movimientos entre brigadas, asignaciones
+      derivadas de solicitudes, cambios de guardia y requerimientos forzados.
+    config:
+      contract:
+        enforced: true
+      group: personal
+      access: public
+      tags:
+        - fact
+        - dominio_personal
+        - dominio_operativo
+        - business_critical
+      meta:
+        owner: "Equipo de Datos - Bomberos Granada"
+        domain: operativa
+        criticality: high
+        grain: "una fila por id_asignacion"
+        sla: daily
 
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(total_asignaciones = 1)"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(total_requerimientos IN (0, 1))"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(total_idas + total_vueltas) <= 1"
+          config:
+            severity: warn
+
+    columns:
+      - name: asignacion_key
+        data_type: varchar
+        description: "Surrogate key de la asignación operativa."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+
+      - name: empleado_key
+        data_type: varchar
+        description: "FK a dim_empleado SCD2, versión vigente en la fecha de la asignación."
+        constraints:
+          - type: not_null
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_empleado')
+                field: empleado_key
+
+      - name: fecha_key
+        data_type: varchar
+        description: "FK a dim_fecha."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+
+      - name: brigada_origen_key
+        data_type: varchar
+        description: "FK a dim_brigada de origen. Puede ser NULL si no aplica."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_brigada')
+                field: brigada_key
+              config:
+                where: "brigada_origen_key IS NOT NULL"
+
+      - name: brigada_destino_key
+        data_type: varchar
+        description: "FK a dim_brigada de destino."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_brigada')
+                field: brigada_key
+              config:
+                where: "brigada_destino_key IS NOT NULL"
+
+      - name: solicitud_key
+        data_type: varchar
+        description: "Clave surrogate de la solicitud asociada, si existe."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('fact_solicitudes')
+                field: solicitud_key
+              config:
+                where: "solicitud_key IS NOT NULL"
+
+      - name: cambio_guardia_key
+        data_type: varchar
+        description: "Clave surrogate del cambio de guardia asociado, si existe."
+
+      - name: id_asignacion
+        data_type: number(38,0)
+        description: "Clave natural de la asignación."
+        data_tests:
+          - unique
+          - not_null
+
+      - name: id_empleado
+        data_type: number(38,0)
+        description: "ID natural del empleado asignado."
+
+      - name: id_brigada_origen
+        data_type: number(38,0)
+        description: "ID natural de la brigada de origen."
+
+      - name: id_brigada_destino
+        data_type: number(38,0)
+        description: "ID natural de la brigada de destino."
+
+      - name: id_solicitud
+        data_type: number(38,0)
+        description: "ID natural de la solicitud asociada, si existe."
+
+      - name: id_cambio_guardia
+        data_type: number(38,0)
+        description: "ID natural del cambio de guardia asociado, si existe."
+
+      - name: id_traslado
+        data_type: number(38,0)
+        description: "ID natural del traslado asociado, si existe."
+
+      - name: fecha_inicio
+        data_type: date
+        description: "Fecha en la que aplica la asignación."
+
+      - name: turno
+        data_type: varchar
+        description: "Turno afectado por la asignación."
+
+      - name: tipo_asignacion
+        data_type: varchar
+        description: "Tipo de asignación: ida o vuelta. Puede ser NULL en registros históricos."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['ida', 'vuelta']
+              config:
+                where: "tipo_asignacion IS NOT NULL"
+
+      - name: es_requerimiento
+        data_type: boolean
+        description: "TRUE si la asignación corresponde a un requerimiento forzado."
+
+      - name: total_asignaciones
+        data_type: number(38,0)
+        description: "Medida aditiva. Siempre vale 1 por fila."
+
+      - name: total_requerimientos
+        data_type: number(38,0)
+        description: "Medida binaria. 1 si la asignación es requerimiento, 0 si no."
+
+      - name: total_idas
+        data_type: number(38,0)
+        description: "Medida binaria. 1 si tipo_asignacion='ida'."
+
+      - name: total_vueltas
+        data_type: number(38,0)
+        description: "Medida binaria. 1 si tipo_asignacion='vuelta'."
+
+      - name: fecha_creacion
+        data_type: timestamp_ntz
+        description: "Fecha de creación del registro."
+
+      - name: fecha_actualizacion
+        data_type: timestamp_ntz
+        description: "Fecha de última actualización."
   - name: fact_incidencias
     description: |
       Tabla de hechos de incidencias. Dos role-playing dimensions sobre dim_empleado:
@@ -1155,3 +1336,5 @@ models:
         label: "Tasa de pendientes"
         numerator: incidencias_pendientes
         denominator: total_incidencias
+
+  
