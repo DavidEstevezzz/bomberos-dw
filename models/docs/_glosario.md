@@ -18,13 +18,13 @@ Categoría agregada del puesto operativo del bombero. Derivada del campo `puesto
 
 Clasificación del día desde el punto de vista operativo del cuerpo de bomberos. Determina la **distribución de horas diurnas/nocturnas** en una guardia, no el precio por hora (eso lo determina `tipo_salario`).
 
-| tipo_dia            | Horas diurnas | Horas nocturnas |
-|---------------------|--------------:|----------------:|
-| Laborable           |            15 |               9 |
-| Festivo víspera     |             0 |              24 |
-| Prefestivo          |             6 |              18 |
-| Festivo             |             2 |              22 |
-| Fin de semana       |        derivado | derivado |
+| tipo_dia        | Horas diurnas | Horas nocturnas | Cuándo aplica                                 |
+|-----------------|--------------:|----------------:|-----------------------------------------------|
+| Laborable       |            15 |               9 | Día normal de trabajo (L-V no festivo)        |
+| Prefestivo      |             6 |              18 | Día laborable anterior a un festivo           |
+| Festivo         |             2 |              22 | Día festivo "puro"                            |
+| Festivo víspera |             0 |              24 | Día festivo que además es víspera de otro     |
+| Fin de semana   |      derivado |        derivado | S-D sin info de guardia (fallback calendario) |
 
 **Origen del dato**:
 - Cuando hay guardia operativa registrada en `stg_bronze__guards`, el `tipo_dia` viene del sistema operativo (fuente de verdad).

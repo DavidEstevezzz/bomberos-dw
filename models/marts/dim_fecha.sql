@@ -57,19 +57,14 @@ enriched AS (
             END
           ) AS tipo_dia
         -- flags binarios derivados de tipo_dia
-        , CASE
-            WHEN LOWER(g.tipo_dia_guardia) IN ('festivo') THEN TRUE
-            ELSE FALSE
-          END AS es_festivo
-        , CASE
-            WHEN LOWER(g.tipo_dia_guardia) IN ('prefestivo', 'festivo víspera') THEN TRUE
-            ELSE FALSE
-          END AS es_prefestivo
+        , CASE WHEN LOWER(g.tipo_dia_guardia) = 'festivo' THEN TRUE ELSE FALSE END AS es_festivo
+        , CASE WHEN LOWER(g.tipo_dia_guardia) = 'prefestivo' THEN TRUE ELSE FALSE END AS es_prefestivo
+        , CASE WHEN LOWER(g.tipo_dia_guardia) = 'festivo víspera' THEN TRUE ELSE FALSE END AS es_festivo_vispera
         , CASE
             WHEN g.tipo_dia_guardia IS NULL AND DAYOFWEEK(s.fecha) NOT IN (0, 6) THEN TRUE
             WHEN LOWER(g.tipo_dia_guardia) = 'laborable' THEN TRUE
             ELSE FALSE
-          END AS es_laborable
+        END AS es_laborable
         -- flag de calidad: marca cuando no tenemos info de guardia para esa fecha
         , CASE
             WHEN g.tipo_dia_guardia IS NULL THEN TRUE
@@ -96,6 +91,7 @@ final AS (
         , tipo_dia
         , es_festivo
         , es_prefestivo
+        , es_festivo_vispera
         , es_laborable
         , es_fin_de_semana
         , sin_datos_guardia

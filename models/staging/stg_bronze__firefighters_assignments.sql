@@ -1,12 +1,10 @@
 WITH 
 
--- import CTE
 src_assignments AS (
     SELECT *
     FROM {{ source('bronze', 'firefighters_assignments') }}
 ),
 
--- renombrado y limpieza
 assignments_renamed AS (
     SELECT
         ID_ASIGNACION AS id_asignacion
@@ -24,4 +22,6 @@ assignments_renamed AS (
     FROM src_assignments
 )
 
-SELECT * FROM assignments_renamed
+SELECT *
+FROM assignments_renamed
+WHERE fecha_inicio >= '2020-01-01'
