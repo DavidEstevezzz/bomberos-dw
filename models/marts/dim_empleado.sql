@@ -12,14 +12,17 @@ dim_empleado_real AS (
         , tipo_usuario
         , puesto
         , categoria_puesto
-        , es_mando_especial
+        , CAST(es_mando_especial AS BOOLEAN) AS es_mando_especial
         , dbt_valid_from AS fecha_inicio_validez
         , dbt_valid_to AS fecha_fin_validez
-        , CASE
-            WHEN dbt_valid_to IS NULL AND COALESCE(dbt_is_deleted, FALSE) = FALSE THEN TRUE
-            ELSE FALSE
-          END AS es_version_actual
-        , COALESCE(dbt_is_deleted, FALSE) AS es_eliminado
+        , CAST(
+            CASE
+                WHEN dbt_valid_to IS NULL AND COALESCE(dbt_is_deleted, FALSE) = FALSE THEN TRUE
+                ELSE FALSE
+            END
+            AS BOOLEAN
+          ) AS es_version_actual
+        , CAST(COALESCE(dbt_is_deleted, FALSE) AS BOOLEAN) AS es_eliminado
     FROM snp_empleado
 ),
 
@@ -32,11 +35,11 @@ unknown_row AS (
         , 'desconocido'::VARCHAR AS tipo_usuario
         , 'desconocido'::VARCHAR AS puesto
         , 'desconocido'::VARCHAR AS categoria_puesto
-        , FALSE AS es_mando_especial
+        , CAST(FALSE AS BOOLEAN) AS es_mando_especial
         , '1900-01-01'::TIMESTAMP_NTZ AS fecha_inicio_validez
         , NULL::TIMESTAMP_NTZ AS fecha_fin_validez
-        , TRUE AS es_version_actual
-        , FALSE AS es_eliminado
+        , CAST(TRUE AS BOOLEAN) AS es_version_actual
+        , CAST(FALSE AS BOOLEAN) AS es_eliminado
 )
 
 SELECT * FROM dim_empleado_real

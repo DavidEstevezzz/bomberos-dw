@@ -90,7 +90,8 @@ sources:
 
       - name: date
         description: "Calendario de festivos/laborables. Actualmente vacía."
-
+        config:
+          freshness: null
       - name: guards
         description: "Guardias diarias por brigada con tipo de día."
         columns:
