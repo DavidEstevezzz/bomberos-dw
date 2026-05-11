@@ -5,7 +5,7 @@ sources:
     description: >
       Datos brutos del sistema OLTP de gestión de Bomberos de Granada.
       14 tablas extraídas desde MariaDB con PII enmascarado.
-    database: BOMBEROS_DW
+    database: "{{ target.database }}"
     schema: BRONZE
     config:
       freshness:

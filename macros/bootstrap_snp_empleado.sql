@@ -16,7 +16,8 @@
 #}
 
 {% set bootstrap_date = '2024-01-01 00:00:00' %}
-{% set snapshot_schema = 'DBT_DESTEVEZ' %}
+{% set snapshot_schema = target.schema %}
+
 
 {% set sql %}
 CREATE OR REPLACE TRANSIENT TABLE {{ target.database }}.{{ snapshot_schema }}.snp_empleado AS
