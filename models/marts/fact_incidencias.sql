@@ -1,4 +1,3 @@
-
 {{
     config(
         materialized='incremental',
@@ -13,6 +12,7 @@ WITH
 stg_incidents AS (
     SELECT * FROM {{ ref('stg_bronze__incidents') }}
     {% if is_incremental() %}
+        -- Lookback window para capturar correcciones retroactivas (MERGE absorbe duplicados)
         WHERE fecha_actualizacion >= DATEADD(
             day,
             -{{ var('reprocess_days', 7) }},
@@ -21,7 +21,8 @@ stg_incidents AS (
     {% endif %}
 ),
 
--- fecha de efecto del resolutor: solo cuando hay resolución real
+-- Calculamos la fecha de efecto del resolutor: NULL si no hay resolución real.
+-- Necesaria como anchor temporal del segundo SCD2 lookup más abajo.
 incidents_with_resolution_date AS (
     SELECT
         i.*
@@ -33,26 +34,25 @@ incidents_with_resolution_date AS (
     FROM stg_incidents i
 ),
 
--- point-in-time lookup: empleado creador con fecha_incidencia
-incidents_with_creator AS (
+-- Doble point-in-time lookup contra dim_empleado SCD2 en una sola CTE:
+--   • creador  → versión vigente en fecha_incidencia
+--   • resolutor → versión vigente en fecha_efecto_resolutor (NULL si sin resolver)
+-- Los aliases distintos (dec/der) permiten resolver dos veces la macro 
+-- join_empleado_scd2 contra la misma dim sin colisión de nombres.
+incidents_with_empleados AS (
     SELECT
         i.*
         , {{ lookup_empleado_scd2('i.id_empleado_creador', 'i.fecha_incidencia', alias='dec') }} AS empleado_creador_key
+        , {{ lookup_empleado_scd2('i.id_empleado_resolutor', 'i.fecha_efecto_resolutor', alias='der') }} AS empleado_resolutor_key
     FROM incidents_with_resolution_date i
     LEFT JOIN {{ ref('dim_empleado') }} dec
         {{ join_empleado_scd2('i.id_empleado_creador', 'i.fecha_incidencia', alias='dec') }}
-),
-
--- point-in-time lookup: empleado resolutor con fecha_actualizacion (solo si resuelta)
-incidents_with_resolver AS (
-    SELECT
-        i.*
-        , {{ lookup_empleado_scd2('i.id_empleado_resolutor', 'i.fecha_efecto_resolutor', alias='der') }} AS empleado_resolutor_key
-    FROM incidents_with_creator i
     LEFT JOIN {{ ref('dim_empleado') }} der
         {{ join_empleado_scd2('i.id_empleado_resolutor', 'i.fecha_efecto_resolutor', alias='der') }}
 ),
 
+-- Casts explícitos en el SELECT final: garantizan estabilidad de tipos 
+-- entre ejecuciones incrementales.
 final AS (
     SELECT
         {{ dbt_utils.generate_surrogate_key(['id_incidencia']) }}::varchar AS incidencia_key
@@ -64,6 +64,8 @@ final AS (
         , {{ dbt_utils.generate_surrogate_key(['id_equipo']) }}::varchar AS equipo_key
 
         -- degenerate dimensions
+        -- TRY_TO_NUMBER tolera valores no numéricos en columnas que en Bronze 
+        -- pueden venir como VARCHAR.
         , id_incidencia::number(38,0) AS id_incidencia
         , id_empleado_creador::number(38,0) AS id_empleado_creador
         , TRY_TO_NUMBER(id_empleado_resolutor)::number(38,0) AS id_empleado_resolutor
@@ -74,7 +76,7 @@ final AS (
         , TRY_TO_NUMBER(id_equipo)::number(38,0) AS id_equipo
         , nombre_equipo_comun::varchar AS nombre_equipo_comun
 
-        -- atributos del hecho
+        -- atributos
         , tipo_incidencia::varchar AS tipo_incidencia
         , estado::varchar AS estado
         , nivel_gravedad::varchar AS nivel_gravedad
@@ -89,7 +91,7 @@ final AS (
         -- auditoría
         , fecha_creacion::timestamp_ntz AS fecha_creacion
         , fecha_actualizacion::timestamp_ntz AS fecha_actualizacion
-    FROM incidents_with_resolver
+    FROM incidents_with_empleados
 )
 
 SELECT * FROM final
