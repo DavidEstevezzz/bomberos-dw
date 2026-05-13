@@ -2,7 +2,7 @@ name: 'bomberos_dw'
 version: '1.0.0'
 config-version: 2
 
-profile: 'default'
+profile: 'default' 
 
 model-paths: ["models"]
 analysis-paths: ["analyses"]
@@ -15,21 +15,31 @@ target-path: "target"
 clean-targets:
   - "target"
   - "dbt_packages"
+
+# ─────────────────────────────────────────────────────────────────
+# Query comments: cada query enviada a Snowflake lleva trazabilidad
+# del modelo dbt que la originó. Útil para FinOps (costes por modelo)
+# y debugging desde QUERY_HISTORY.
+# ─────────────────────────────────────────────────────────────────
+query-comment:
+  comment: "{{ query_comment(node) }}"
+  append: true
+
 vars:
+  # Ventana de reprocesamiento incremental (días). Aplica a facts
+  # incrementales para capturar correcciones retroactivas del OLTP.
   reprocess_days: 7
 
 models:
   bomberos_dw:
     +meta:
-      pii_status: masked       # todos los modelos tienen PII suprimida o tokenizada
+      pii_status: masked          # PII suprimida o tokenizada
       project: bomberos_dw
 
     staging:
       +materialized: view
       +schema: silver
-      +tags:
-        - silver
-        - staging
+      +tags: [silver, staging]
       +meta:
         layer: silver
         criticality: medium
@@ -37,9 +47,16 @@ models:
     marts:
       +materialized: table
       +schema: gold
-      +tags:
-        - gold
+      +tags: [gold]
       +meta:
         layer: gold
         criticality: high
         refresh_frequency: daily
+
+snapshots:
+  bomberos_dw:
+    +tags: [snapshots]
+    +meta:
+      layer: snapshots
+      criticality: high
+      pii_status: masked

@@ -1,4 +1,3 @@
--- models/marts/fact_solicitudes.sql
 
 {{
     config(
@@ -14,6 +13,7 @@ WITH
 stg_requests AS (
     SELECT * FROM {{ ref('stg_bronze__requests') }}
     {% if is_incremental() %}
+        -- Lookback window para correcciones retroactivas (MERGE absorbe duplicados)
         WHERE fecha_actualizacion >= DATEADD(
             day,
             -{{ var('reprocess_days', 7) }},
@@ -26,24 +26,14 @@ stg_assignments AS (
     SELECT * FROM {{ ref('stg_bronze__firefighters_assignments') }}
 ),
 
-stg_shift_changes AS (
-    SELECT * FROM {{ ref('stg_bronze__shift_change_requests') }}
-),
-
-requerimientos_por_solicitud AS (
-    SELECT
-        id_solicitud
-        , COUNT(*) AS total_requerimientos
-    FROM stg_assignments
-    WHERE es_requerimiento = TRUE
-      AND id_solicitud IS NOT NULL
-    GROUP BY id_solicitud
-),
-
-asignaciones_por_solicitud AS (
+-- Conditional aggregation: dos métricas en un solo escaneo de stg_assignments
+-- en lugar de dos GROUP BY independientes. COUNT(CASE WHEN ...) ignora NULL,
+-- por lo que solo cuenta filas donde es_requerimiento es TRUE.
+agregados_por_solicitud AS (
     SELECT
         id_solicitud
         , COUNT(*) AS total_asignaciones
+        , COUNT(CASE WHEN es_requerimiento THEN 1 END) AS total_requerimientos
     FROM stg_assignments
     WHERE id_solicitud IS NOT NULL
     GROUP BY id_solicitud
@@ -61,7 +51,10 @@ solicitudes_enriched AS (
         , r.turno
         , r.estado
         , COALESCE(a.total_asignaciones, 0) AS total_asignaciones_generadas
-        , COALESCE(req.total_requerimientos, 0) AS total_requerimientos_generados
+        , COALESCE(a.total_requerimientos, 0) AS total_requerimientos_generados
+        -- Duración inclusiva (+1 para contar ambos extremos).
+        -- ELSE 1: solicitudes sin rango de fechas representan 1 día parcial 
+        -- (medido en horas_solicitadas).
         , CASE
             WHEN r.fecha_fin IS NOT NULL AND r.fecha_inicio IS NOT NULL
             THEN DATEDIFF('day', r.fecha_inicio, r.fecha_fin) + 1
@@ -70,13 +63,11 @@ solicitudes_enriched AS (
         , r.fecha_creacion
         , r.fecha_actualizacion
     FROM stg_requests r
-    LEFT JOIN asignaciones_por_solicitud a
+    LEFT JOIN agregados_por_solicitud a
         ON r.id_solicitud = a.id_solicitud
-    LEFT JOIN requerimientos_por_solicitud req
-        ON r.id_solicitud = req.id_solicitud
 ),
 
--- point-in-time lookup contra dim_empleado SCD2
+-- Point-in-time SCD2 lookup contra dim_empleado vigente en fecha_inicio
 solicitudes_with_empleado AS (
     SELECT
         s.*
@@ -90,23 +81,35 @@ final AS (
     SELECT
         {{ dbt_utils.generate_surrogate_key(['id_solicitud']) }} AS solicitud_key
         , empleado_key
+
+        -- Role-playing dimensions: dos FKs distintas hacia la misma dim_fecha.
+        -- Permite queries como "duración media entre solicitud y aprobación"
+        -- sin necesidad de mantener dos dimensiones físicas.
         , {{ dbt_utils.generate_surrogate_key(['fecha_inicio']) }} AS fecha_inicio_key
-        , {{ dbt_utils.generate_surrogate_key(['fecha_fin']) }} AS fecha_fin_key
+        , CASE 
+            WHEN fecha_fin IS NOT NULL 
+            THEN {{ dbt_utils.generate_surrogate_key(['fecha_fin']) }}
+            ELSE NULL
+          END AS fecha_fin_key
+
         -- degenerate dimensions
         , id_solicitud
         , id_empleado
         , id_empleado_gestor
-        -- atributos del hecho
+
+        -- atributos
         , tipo_permiso
         , turno
         , estado
         , fecha_inicio
         , fecha_fin
+
         -- medidas
         , horas_solicitadas
         , dias_solicitados
         , total_asignaciones_generadas
         , total_requerimientos_generados
+
         -- auditoría
         , fecha_creacion
         , fecha_actualizacion
