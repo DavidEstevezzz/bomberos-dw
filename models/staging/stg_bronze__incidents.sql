@@ -6,28 +6,27 @@ src_incidents AS (
     FROM {{ source('bronze', 'incidents') }}
 ),
 
--- renombrado y limpieza
+-- renombrado, limpieza y tipado
 incidents_renamed AS (
     SELECT
-        ID_INCIDENCIA AS id_incidencia
-        , ID_EMPLEADO AS id_empleado_creador
+        ID_INCIDENCIA::NUMBER(38,0) AS id_incidencia
+        , ID_EMPLEADO::NUMBER(38,0) AS id_empleado_creador
         , {{ limpiar_texto('TIPO') }} AS tipo_incidencia
         , {{ limpiar_texto('ESTADO') }} AS estado
-        , {{ limpiar_texto('NIVEL') }} AS nivel_gravedad
-        , FECHA AS fecha_incidencia
-        , ID_PARQUE AS id_parque
-        , MATRICULA AS matricula_vehiculo
-        , ID_EMPLEADO2 AS id_empleado_referenciado
-        , EQUIPO AS id_equipo
-        , RESULTA_POR AS id_empleado_resolutor
-        , COALESCE(LEIDO, FALSE) AS esta_leido
-        , TRIM(NOMBRE_EQUIPO) AS nombre_equipo_comun
+        , NULLIF({{ limpiar_texto('NIVEL') }}, '') AS nivel_gravedad
+        , FECHA::DATE AS fecha_incidencia
+        , ID_PARQUE::NUMBER(38,0) AS id_parque
+        , NULLIF(TRIM(MATRICULA), '') AS matricula_vehiculo
+        , TRY_TO_NUMBER(ID_EMPLEADO2)::NUMBER(38,0) AS id_empleado_referenciado
+        , TRY_TO_NUMBER(EQUIPO)::NUMBER(38,0) AS id_equipo
+        , TRY_TO_NUMBER(RESULTA_POR)::NUMBER(38,0) AS id_empleado_resolutor
+        , COALESCE(LEIDO, FALSE)::BOOLEAN AS esta_leido
+        , NULLIF(TRIM(NOMBRE_EQUIPO), '') AS nombre_equipo_comun
         {{ campos_auditoria() }}
     FROM src_incidents
 ),
 
 -- campos derivados
-
 incidents_with_metrics AS (
     SELECT
         *

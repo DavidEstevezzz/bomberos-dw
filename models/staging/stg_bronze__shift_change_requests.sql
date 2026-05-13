@@ -6,17 +6,17 @@ src_shift_changes AS (
     FROM {{ source('bronze', 'shift_change_requests') }}
 ),
 
--- renombrado y limpieza
+-- renombrado, limpieza y tipado
 shift_changes_renamed AS (
     SELECT
-        ID AS id_cambio
-        , ID_EMPLEADO1 AS id_empleado_solicitante
-        , ID_EMPLEADO2 AS id_empleado_receptor
-        , ID_EMPLEADO3 AS id_empleado_aprobador
-        , BRIGADA1 AS id_brigada_solicitante
-        , BRIGADA2 AS id_brigada_receptor
-        , FECHA AS fecha_cambio
-        , FECHA2 AS fecha_cambio_espejo
+        ID::NUMBER(38,0) AS id_cambio
+        , ID_EMPLEADO1::NUMBER(38,0) AS id_empleado_solicitante
+        , ID_EMPLEADO2::NUMBER(38,0) AS id_empleado_receptor
+        , ID_EMPLEADO3::NUMBER(38,0) AS id_empleado_aprobador
+        , BRIGADA1::NUMBER(38,0) AS id_brigada_solicitante
+        , BRIGADA2::NUMBER(38,0) AS id_brigada_receptor
+        , FECHA::DATE AS fecha_cambio
+        , FECHA2::DATE AS fecha_cambio_espejo
         , {{ limpiar_texto('ESTADO') }} AS estado
         , {{ limpiar_texto('TURNO') }} AS turno
         {{ campos_auditoria() }}

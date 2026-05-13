@@ -6,12 +6,12 @@ src_parks AS (
     FROM {{ source('bronze', 'parks') }}
 ),
 
--- renombrado
+-- renombrado y limpieza
 parks_renamed AS (
     SELECT
         ID_PARQUE AS id_parque
-        , TRIM(NOMBRE) AS nombre_parque
-        , TRIM(UBICACION) AS ubicacion
+        , NULLIF(TRIM(NOMBRE), '') AS nombre_parque
+        , NULLIF(TRIM(UBICACION), '') AS ubicacion
     FROM src_parks
 )
 

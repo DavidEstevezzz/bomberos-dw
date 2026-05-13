@@ -45,6 +45,7 @@ models:
         description: "TRUE si tiene rol especial de mando (ej. coordinación de prácticas)."
         data_tests:
           - not_null
+      
 
   # ============================================================
   # PARKS
@@ -200,6 +201,11 @@ models:
                 field: id_brigada
       - name: tipo_dia
         description: '{{ doc("tipo_dia") }}'
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['festivo', 'prefestivo', 'laborable', 'festivo víspera']
 
   # ============================================================
   # REQUESTS — solicitudes de permisos
@@ -422,11 +428,13 @@ models:
               arguments:
                 values: ['pendiente', 'tramitada', 'resuelta']
       - name: nivel_gravedad
-        description: "Nivel de gravedad: bajo, medio, alto. Vacío en algunas filas históricas."
+        description: "Nivel de gravedad: bajo, medio o alto. Puede ser NULL en algunas filas históricas."
         data_tests:
           - accepted_values:
               arguments:
-                values: ['bajo', 'medio', 'alto', '']
+                values: ['bajo', 'medio', 'alto']
+              config:
+                where: "nivel_gravedad IS NOT NULL"
       - name: id_parque
         description: "FK al parque donde ocurre la incidencia."
         data_tests:

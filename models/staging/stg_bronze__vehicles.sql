@@ -6,14 +6,14 @@ src_vehicles AS (
     FROM {{ source('bronze', 'vehicles') }}
 ),
 
--- renombrado
+-- renombrado, limpieza y tipado
 vehicles_renamed AS (
     SELECT
-        MATRICULA AS matricula_token
-        , TRIM(NOMBRE) AS nombre_vehiculo
-        , ID_PARQUE AS id_parque
+        NULLIF(TRIM(MATRICULA), '') AS matricula_token
+        , NULLIF(TRIM(NOMBRE), '') AS nombre_vehiculo
+        , TRY_TO_NUMBER(ID_PARQUE)::NUMBER(38,0) AS id_parque
         , {{ limpiar_texto('TIPO') }} AS tipo_vehiculo
-        , ANO AS anio_vehiculo
+        , TRY_TO_NUMBER(ANO)::NUMBER(38,0) AS anio_vehiculo
         {{ campos_auditoria() }}
     FROM src_vehicles
 )

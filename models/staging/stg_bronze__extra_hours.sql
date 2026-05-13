@@ -6,18 +6,18 @@ src_extra_hours AS (
     FROM {{ source('bronze', 'extra_hours') }}
 ),
 
--- renombrado y limpieza
+-- renombrado, limpieza y tipado
 extra_hours_renamed AS (
     SELECT
-        ID AS id_hora_extra
-        , DATE AS fecha
-        , ID_EMPLEADO AS id_empleado
-        , ID_SALARIO AS id_salario
-        , COALESCE(HORAS_DIURNAS, 0) AS horas_diurnas
-        , COALESCE(HORAS_NOCTURNAS, 0) AS horas_nocturnas
+        ID::NUMBER(38,0) AS id_hora_extra
+        , DATE::DATE AS fecha
+        , ID_EMPLEADO::NUMBER(38,0) AS id_empleado
+        , ID_SALARIO::NUMBER(38,0) AS id_salario
+        , COALESCE(HORAS_DIURNAS, 0)::NUMBER(38,0) AS horas_diurnas
+        , COALESCE(HORAS_NOCTURNAS, 0)::NUMBER(38,0) AS horas_nocturnas
         {{ campos_auditoria() }}
     FROM src_extra_hours
-    WHERE DATE >= '2020-01-01'
+    WHERE DATE::DATE >= '2020-01-01'
 ),
 
 -- campos derivados
