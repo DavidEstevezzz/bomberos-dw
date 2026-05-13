@@ -1,18 +1,17 @@
 WITH 
 
--- import CTE
 src_users AS (
     SELECT *
     FROM {{ source('bronze', 'users') }}
 ),
 
--- renombrado y limpieza
 users_renamed AS (
     SELECT
         ID_EMPLEADO AS id_empleado
         , NOMBRE AS nombre_token
         , {{ limpiar_texto('TYPE') }} AS tipo_usuario
         , TRIM(PUESTO) AS puesto
+        , {{ limpiar_texto('PUESTO') }} AS puesto_normalizado
         , COALESCE(AP, 0) AS dias_asuntos_propios
         , COALESCE(VACACIONES, 0) AS dias_vacaciones
         , COALESCE(MODULO, 0) AS dias_modulo
@@ -24,14 +23,25 @@ users_renamed AS (
     FROM src_users
 ),
 
--- campos derivados
 users_with_category AS (
     SELECT
-        *
+        id_empleado
+        , nombre_token
+        , tipo_usuario
+        , puesto
+        , dias_asuntos_propios
+        , dias_vacaciones
+        , dias_modulo
+        , salidas_personales
+        , dias_compensacion_grupos
+        , horas_sindicales
+        , es_mando_especial
+        , fecha_creacion
+        , fecha_actualizacion
         , CASE
-            WHEN puesto IN ('Conductor', 'Operador', 'Bombero') THEN 'Tropa'
-            WHEN puesto IN ('Subinspector', 'Oficial') THEN 'Mando'
-            WHEN puesto IS NULL THEN 'Administrativo'
+            WHEN puesto_normalizado IN ('conductor', 'operador', 'bombero') THEN 'Tropa'
+            WHEN puesto_normalizado IN ('subinspector', 'oficial') THEN 'Mando'
+            WHEN puesto_normalizado IS NULL THEN 'Administrativo'
             ELSE 'Desconocido'
           END AS categoria_puesto
     FROM users_renamed

@@ -32,6 +32,10 @@ vars:
 
 models:
   bomberos_dw:
+    +persist_docs:
+      relation: true
+      columns: true
+      
     +meta:
       pii_status: masked          # PII suprimida o tokenizada
       project: bomberos_dw

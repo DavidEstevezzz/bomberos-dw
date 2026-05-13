@@ -6,14 +6,14 @@ src_equipos AS (
     FROM {{ source('bronze', 'equipos_personales') }}
 ),
 
--- renombrado
+-- renombrado, limpieza y tipado
 equipos_renamed AS (
     SELECT
-        ID AS id_equipo
-        , TRIM(NOMBRE) AS nombre_equipo
-        , {{ limpiar_texto('CATEGORIA') }} AS categoria_equipo
-        , COALESCE(DISPONIBLE, FALSE) AS esta_disponible
-        , PARQUE AS id_parque
+        ID::NUMBER(38,0) AS id_equipo
+        , NULLIF(TRIM(NOMBRE), '') AS nombre_equipo
+        , NULLIF({{ limpiar_texto('CATEGORIA') }}, '') AS categoria_equipo
+        , COALESCE(DISPONIBLE, FALSE)::BOOLEAN AS esta_disponible
+        , TRY_TO_NUMBER(PARQUE)::NUMBER(38,0) AS id_parque
         {{ campos_auditoria() }}
     FROM src_equipos
 )

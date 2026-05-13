@@ -7,15 +7,29 @@ sources:
       14 tablas extraídas desde MariaDB con PII enmascarado.
     database: "{{ target.database }}"
     schema: BRONZE
+
     config:
+      tags: [bronze, source, oltp]
+      meta:
+        layer: bronze
+        source_system: bomberos_oltp_mariadb
+        ingestion_type: batch
+        owner: data_engineering
+        pii_status: masked
+        pii_strategy: tokenized_at_ingestion
+        description: "Fuente Bronze procedente del sistema operacional de Bomberos de Granada."
+
       freshness:
         warn_after: {count: 30, period: day}
         error_after: {count: 60, period: day}
+
       loaded_at_field: _LOADED_AT
+
     quoting:
       database: false
       schema: false
       identifier: false
+
     tables:
       - name: users
         description: "Bomberos y mandos del cuerpo. Nombre tokenizado (BOMBERO_XXX)."
@@ -101,6 +115,10 @@ sources:
               - not_null
           - name: TIPO
             description: "Festivo, Prefestivo, Laborable, Festivo víspera."
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['Festivo', 'Prefestivo', 'Laborable', 'Festivo víspera']
 
       - name: requests
         description: "Solicitudes de permisos y vacaciones."
@@ -115,6 +133,13 @@ sources:
               - accepted_values:
                   arguments:
                     values: ['Pendiente', 'Confirmada', 'Cancelada', 'Denegada']
+          - name: ID_EMPLEADO
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('bronze', 'users')
+                    field: ID_EMPLEADO
 
       - name: shift_change_requests
         description: "Solicitudes de cambio de guardia entre bomberos."
@@ -141,7 +166,28 @@ sources:
               - accepted_values:
                   arguments:
                     values: ['ida', 'vuelta']
-
+          - name: ID_EMPLEADO
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('bronze', 'users')
+                    field: ID_EMPLEADO
+          - name: ID_BRIGADA_DESTINO
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('bronze', 'brigades')
+                    field: ID_BRIGADA
+          - name: ID_BRIGADA_ORIGEN
+            data_tests:
+              - relationships:
+                  arguments:
+                    to: source('bronze', 'brigades')
+                    field: ID_BRIGADA
+                  config:
+                    where: "ID_BRIGADA_ORIGEN IS NOT NULL"
       - name: incidents
         description: "Incidencias sobre vehículos, personal, equipos e instalaciones."
         columns:
@@ -158,7 +204,16 @@ sources:
             data_tests:
               - accepted_values:
                   arguments:
-                    values: ['bajo', 'medio', 'alto', '']
+                    values: ['bajo', 'medio', 'alto']
+                  config:
+                    where: "NIVEL IS NOT NULL AND NIVEL <> ''"
+          - name: ID_PARQUE
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('bronze', 'parks')
+                    field: ID_PARQUE
 
       - name: vehicles
         description: "Vehículos del cuerpo. Matrícula tokenizada (VEHICULO_XXX)."
@@ -167,6 +222,14 @@ sources:
             data_tests:
               - unique
               - not_null
+          - name: ID_PARQUE
+            data_tests:
+              - relationships:
+                  arguments:
+                    to: source('bronze', 'parks')
+                    field: ID_PARQUE
+                  config:
+                    where: "ID_PARQUE IS NOT NULL"
 
       - name: equipos_personales
         description: "Equipos personales (radios, linternas, PTT, etc.)."
