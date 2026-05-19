@@ -62,6 +62,7 @@ solicitudes_enriched AS (
           END AS dias_solicitados
         , r.fecha_creacion
         , r.fecha_actualizacion
+        , r.fecha_carga_bronze
     FROM stg_requests r
     LEFT JOIN agregados_por_solicitud a
         ON r.id_solicitud = a.id_solicitud

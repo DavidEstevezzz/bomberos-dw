@@ -1,3 +1,41 @@
+{{
+    config(
+        materialized='table'
+    )
+}}
+
+WITH
+
+-- Time spine: una fila por día garantizada, sin huecos
+spine AS (
+    SELECT date_day AS fecha
+    FROM {{ ref('dim_time') }}
+),
+
+-- Guardias del sistema operativo: aporta tipo_dia cuando existe dato real
+stg_guards AS (
+    SELECT *
+    FROM {{ ref('stg_bronze__guards') }}
+),
+
+-- Si hay varias guardias por fecha, nos quedamos con una fila representativa
+guards_per_date AS (
+    SELECT
+        fecha
+        , tipo_dia
+        , ROW_NUMBER() OVER (PARTITION BY fecha ORDER BY id_guardia) AS rn
+    FROM stg_guards
+),
+
+guards_unique AS (
+    SELECT
+        fecha
+        , tipo_dia AS tipo_dia_guardia
+    FROM guards_per_date
+    WHERE rn = 1
+),
+
+-- Enriquecimiento calendario + tipo de día operativo
 enriched AS (
     SELECT
         s.fecha
@@ -9,7 +47,7 @@ enriched AS (
         , MONTHNAME(s.fecha) AS mes_nombre
         , WEEKOFYEAR(s.fecha) AS semana_anio
         , DAY(s.fecha) AS dia
-        , DAYOFWEEK(s.fecha) AS dia_semana_num
+        , DAYOFWEEKISO(s.fecha) AS dia_semana_num
         , DAYNAME(s.fecha) AS dia_semana_nombre
 
         -- tipo de día operativo: viene exclusivamente de guards
@@ -17,7 +55,7 @@ enriched AS (
 
         -- flags derivados del calendario
         , CASE
-            WHEN DAYOFWEEK(s.fecha) IN (0, 6) THEN TRUE
+            WHEN DAYOFWEEKISO(s.fecha) IN (6, 7) THEN TRUE
             ELSE FALSE
           END AS es_fin_de_semana
 
@@ -27,7 +65,7 @@ enriched AS (
         , CASE WHEN g.tipo_dia_guardia = 'festivo víspera' THEN TRUE ELSE FALSE END AS es_festivo_vispera
         , CASE WHEN g.tipo_dia_guardia = 'laborable' THEN TRUE ELSE FALSE END AS es_laborable
 
-        -- flag de calidad
+        -- flag de calidad: TRUE si no tenemos dato operativo de guardia
         , CASE
             WHEN g.tipo_dia_guardia IS NULL THEN TRUE
             ELSE FALSE
@@ -36,4 +74,28 @@ enriched AS (
     FROM spine s
     LEFT JOIN guards_unique g
         ON s.fecha = g.fecha
+),
+
+final AS (
+    SELECT
+        {{ dbt_utils.generate_surrogate_key(['fecha']) }} AS fecha_key
+        , fecha
+        , anio
+        , trimestre
+        , mes
+        , mes_nombre
+        , semana_anio
+        , dia
+        , dia_semana_num
+        , dia_semana_nombre
+        , tipo_dia
+        , sin_datos_guardia
+        , es_festivo
+        , es_prefestivo
+        , es_festivo_vispera
+        , es_laborable
+        , es_fin_de_semana
+    FROM enriched
 )
+
+SELECT * FROM final

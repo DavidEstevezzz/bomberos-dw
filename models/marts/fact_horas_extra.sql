@@ -81,7 +81,8 @@ horas_extra_enriched AS (
         (eh.horas_diurnas * s.precio_hora_diurna)
             + (eh.horas_nocturnas * s.precio_hora_nocturna) AS coste_total,
         eh.fecha_creacion,
-        eh.fecha_actualizacion
+        eh.fecha_actualizacion,
+        eh.fecha_carga_bronze
     FROM stg_extra_hours eh
     LEFT JOIN stg_salaries s
         ON eh.id_salario = s.id_salario
@@ -143,7 +144,8 @@ final AS (
 
         -- ── Auditoría ─────────────────────────────────────────────────────
         fecha_creacion,
-        fecha_actualizacion
+        fecha_actualizacion,
+        fecha_carga_bronze
     FROM horas_extra_with_empleado
 )
 
