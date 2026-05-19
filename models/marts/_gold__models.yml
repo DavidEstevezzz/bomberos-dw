@@ -301,7 +301,7 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: ['festivo', 'prefestivo', 'laborable', 'fin de semana', 'festivo víspera']
+                values: ['festivo', 'prefestivo', 'laborable', 'festivo víspera']
       - name: sin_datos_guardia
         data_type: boolean
         description: "TRUE si no hay registro de guardia para esta fecha. Útil para auditoría de calidad de dato."

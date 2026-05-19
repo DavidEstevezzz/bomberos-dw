@@ -49,11 +49,7 @@ final AS (
             ELSE NULL
           END AS brigada_origen_key
 
-        , CASE
-            WHEN id_brigada_destino IS NOT NULL
-            THEN {{ dbt_utils.generate_surrogate_key(['id_brigada_destino']) }}
-            ELSE NULL
-          END AS brigada_destino_key
+        , {{ dbt_utils.generate_surrogate_key(['id_brigada_destino']) }} AS brigada_destino_key
 
         , CASE
             WHEN id_solicitud IS NOT NULL
@@ -91,6 +87,7 @@ final AS (
         -- auditoría
         , fecha_creacion
         , fecha_actualizacion
+        , fecha_carga_bronze
 
     FROM assignments_with_empleado
 )

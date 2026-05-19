@@ -108,8 +108,16 @@ final AS (
         {{ dbt_utils.generate_surrogate_key(['id_hora_extra']) }} AS horas_extra_key,
         empleado_key,                                                    -- versionada SCD2
         {{ dbt_utils.generate_surrogate_key(['fecha']) }} AS fecha_key,
-        {{ dbt_utils.generate_surrogate_key(['id_brigada_guardia']) }} AS brigada_key,
-        {{ dbt_utils.generate_surrogate_key(['id_salario']) }} AS salario_key,
+        
+        CASE
+            WHEN id_brigada_guardia = -1 THEN '-1'
+            ELSE {{ dbt_utils.generate_surrogate_key(['id_brigada_guardia']) }}
+        END AS brigada_key,
+
+        CASE
+            WHEN id_salario IS NULL THEN '-1'
+            ELSE {{ dbt_utils.generate_surrogate_key(['id_salario']) }}
+        END AS salario_key,
 
         -- ── Degenerate dimensions y business keys ─────────────────────────
         -- Mantenidas junto a las surrogate keys para facilitar debugging

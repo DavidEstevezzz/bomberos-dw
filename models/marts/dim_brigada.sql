@@ -9,7 +9,7 @@ stg_parks AS (
     SELECT * FROM {{ ref('stg_bronze__parks') }}
 ),
 
--- denormalización: incluir nombre del parque en la dimensión (star schema)
+-- denormalización: incluir nombre del parque en la dimensión
 brigades_enriched AS (
     SELECT
         b.id_brigada
@@ -24,7 +24,7 @@ brigades_enriched AS (
 ),
 
 -- surrogate key
-dim_brigada AS (
+dim_brigada_real AS (
     SELECT
         {{ dbt_utils.generate_surrogate_key(['id_brigada']) }} AS brigada_key
         , id_brigada
@@ -34,17 +34,20 @@ dim_brigada AS (
         , id_parque
         , nombre_parque
     FROM brigades_enriched
+),
+
+-- Default Dimension Row para hechos sin brigada conocida
+unknown_row AS (
+    SELECT
+        '-1'::VARCHAR AS brigada_key
+        , -1::NUMBER(38,0) AS id_brigada
+        , 'DESCONOCIDA'::VARCHAR AS nombre_brigada
+        , FALSE::BOOLEAN AS es_especial
+        , FALSE::BOOLEAN AS es_brigada_servicio
+        , -1::NUMBER(38,0) AS id_parque
+        , 'DESCONOCIDO'::VARCHAR AS nombre_parque
 )
 
-SELECT * FROM dim_brigada
-
+SELECT * FROM dim_brigada_real
 UNION ALL
-
-SELECT
-    {{ dbt_utils.generate_surrogate_key(['-1']) }} AS brigada_key
-    , -1 AS id_brigada
-    , 'Desconocida' AS nombre_brigada
-    , FALSE AS es_especial
-    , FALSE AS es_brigada_servicio
-    , -1 AS id_parque
-    , 'Desconocido' AS nombre_parque
+SELECT * FROM unknown_row

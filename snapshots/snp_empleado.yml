@@ -2,7 +2,11 @@ version: 2
 
 snapshots:
   - name: snp_empleado
-    description: "Snapshot SCD Tipo 2 de empleados. Captura cambios estructurales: puesto, tipo y rol."
+    description: >
+      Snapshot SCD Tipo 2 de empleados. Captura cambios estructurales en atributos
+      relevantes para el análisis histórico, como tipo de usuario, puesto, categoría
+      funcional y rol especial de mando. No captura cambios en contadores operativos
+      volátiles como vacaciones o asuntos propios.
     relation: ref('stg_bronze__users')
     config:
       strategy: check
@@ -13,16 +17,37 @@ snapshots:
         - categoria_puesto
         - es_mando_especial
       hard_deletes: new_record
+
     columns:
       - name: id_empleado
         description: "Identificador único del bombero."
+
       - name: nombre_token
-        description: "Nombre anonimizado (BOMBERO_XXX)."
+        description: "Nombre anonimizado del empleado."
+
       - name: tipo_usuario
-        description: "Rol: jefe, mando, bombero, empleado."
+        description: "Rol del usuario en el sistema: jefe, mando, bombero o empleado."
+
       - name: puesto
-        description: "Puesto operativo."
+        description: "Puesto operativo del empleado."
+
       - name: categoria_puesto
-        description: "Categoría derivada: Tropa, Mando, Administrativo."
+        description: "Categoría funcional derivada: Tropa, Mando, Administrativo o Desconocido."
+
       - name: es_mando_especial
-        description: "TRUE si es mando especial."
+        description: "TRUE si el empleado tiene un rol especial de mando."
+
+      - name: dbt_valid_from
+        description: "Timestamp desde el que esta versión del empleado es válida en el snapshot."
+
+      - name: dbt_valid_to
+        description: "Timestamp hasta el que esta versión del empleado fue válida. NULL si es la versión actual."
+
+      - name: dbt_scd_id
+        description: "Identificador interno generado por dbt para cada versión SCD."
+
+      - name: dbt_updated_at
+        description: "Timestamp usado por dbt para registrar la actualización del snapshot."
+
+      - name: dbt_is_deleted
+        description: "TRUE si el registro fue eliminado del origen y registrado como hard delete."

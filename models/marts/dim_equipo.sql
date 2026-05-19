@@ -24,7 +24,7 @@ equipos_enriched AS (
 ),
 
 -- surrogate key
-dim_equipo AS (
+dim_equipo_real AS (
     SELECT
         {{ dbt_utils.generate_surrogate_key(['id_equipo']) }} AS equipo_key
         , id_equipo
@@ -34,6 +34,20 @@ dim_equipo AS (
         , id_parque
         , nombre_parque
     FROM equipos_enriched
+),
+
+-- Default Dimension Row para hechos sin equipo conocido
+unknown_row AS (
+    SELECT
+        '-1'::VARCHAR AS equipo_key
+        , -1::NUMBER(38,0) AS id_equipo
+        , 'DESCONOCIDO'::VARCHAR AS nombre_equipo
+        , 'desconocido'::VARCHAR AS categoria_equipo
+        , FALSE::BOOLEAN AS esta_disponible
+        , -1::NUMBER(38,0) AS id_parque
+        , 'DESCONOCIDO'::VARCHAR AS nombre_parque
 )
 
-SELECT * FROM dim_equipo
+SELECT * FROM dim_equipo_real
+UNION ALL
+SELECT * FROM unknown_row
