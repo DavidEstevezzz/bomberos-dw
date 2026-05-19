@@ -441,3 +441,522 @@ models:
       - name: tipos_permiso_usados
         data_type: varchar
         description: "Listado de tipos de permiso solicitados por el empleado en el periodo."
+  - name: horas_extra_estacionalidad
+    description: >
+      Modelo analítico mensual de horas extra. Una fila por mes. Permite analizar
+      la distribución mensual de horas diurnas y nocturnas, el coste por franja
+      horaria, y la composición por tipo de tarifa (Subinspector / Tropa).
+      Periodo analizado: 2026-01-01 a 2026-05-05.
+    config:
+      contract:
+        enforced: true
+      group: costes
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_costes
+        - presentation_portfolio
+      meta:
+        owner: "Jefatura del Cuerpo de Bomberos de Granada"
+        domain: costes
+        criticality: medium
+        grain: "una fila por mes"
+        use_case: "estacionalidad_mensual_horas_extra"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_horas = total_horas_diurnas + total_horas_nocturnas"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "ABS(coste_total - (coste_diurno + coste_nocturno)) <= 0.05"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_horas >= 0 AND coste_total >= 0"
+
+    columns:
+      - name: mes
+        data_type: date
+        description: "Mes analizado (truncado al primer día del mes)."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+
+      - name: total_registros
+        data_type: number(38,0)
+        description: "Número total de registros de horas extra del mes."
+
+      - name: empleados_distintos
+        data_type: number(38,0)
+        description: "Número de empleados distintos con horas extra en el mes."
+
+      - name: total_horas_diurnas
+        data_type: number(38,0)
+        description: "Total de horas diurnas realizadas."
+
+      - name: total_horas_nocturnas
+        data_type: number(38,0)
+        description: "Total de horas nocturnas realizadas."
+
+      - name: total_horas
+        data_type: number(38,0)
+        description: "Total de horas (diurnas + nocturnas)."
+
+      - name: pct_horas_diurnas
+        data_type: number(38,2)
+        description: "Porcentaje de horas diurnas sobre el total del mes."
+
+      - name: pct_horas_nocturnas
+        data_type: number(38,2)
+        description: "Porcentaje de horas nocturnas sobre el total del mes."
+
+      - name: coste_diurno
+        data_type: number(38,2)
+        description: "Coste total de las horas diurnas del mes."
+
+      - name: coste_nocturno
+        data_type: number(38,2)
+        description: "Coste total de las horas nocturnas del mes."
+
+      - name: coste_total
+        data_type: number(38,2)
+        description: "Coste total de las horas extra del mes."
+
+      - name: pct_coste_diurno
+        data_type: number(38,2)
+        description: "Porcentaje del coste diurno sobre el coste total del mes."
+
+      - name: pct_coste_nocturno
+        data_type: number(38,2)
+        description: "Porcentaje del coste nocturno sobre el coste total del mes."
+
+      - name: media_horas_por_registro
+        data_type: number(38,2)
+        description: "Media de horas por registro de horas extra."
+
+      - name: media_coste_por_registro
+        data_type: number(38,2)
+        description: "Media de coste por registro de horas extra."
+
+      - name: coste_medio_por_hora
+        data_type: number(38,2)
+        description: "Coste medio por hora trabajada (coste_total / total_horas)."
+
+      - name: coste_subinspector
+        data_type: number(38,2)
+        description: "Coste total de las horas extra tarifadas como Subinspector."
+
+      - name: coste_tropa
+        data_type: number(38,2)
+        description: "Coste total de las horas extra tarifadas como Tropa."
+
+  - name: horas_extra_tipo_dia
+    description: >
+      Modelo analítico que agrega horas extra por tipo de día (festivo,
+      prefestivo, laborable, festivo víspera). Permite comparar el coste y
+      volumen entre franjas y detectar si los festivos disparan el gasto.
+      Periodo analizado: 2026-01-01 a 2026-05-05.
+    config:
+      contract:
+        enforced: true
+      group: costes
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_costes
+        - presentation_portfolio
+      meta:
+        owner: "Jefatura del Cuerpo de Bomberos de Granada"
+        domain: costes
+        criticality: medium
+        grain: "una fila por tipo_dia"
+        use_case: "comparacion_coste_horas_extra_por_tipo_dia"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_horas = total_horas_diurnas + total_horas_nocturnas"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "ABS(coste_total - (coste_diurno + coste_nocturno)) <= 0.05"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_horas >= 0 AND coste_total >= 0"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "pct_coste_sobre_total BETWEEN 0 AND 100"
+          config:
+            where: "pct_coste_sobre_total IS NOT NULL"
+
+    columns:
+      - name: tipo_dia
+        data_type: varchar
+        description: "Tipo operativo del día: festivo, prefestivo, laborable o festivo víspera."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['festivo', 'prefestivo', 'laborable', 'festivo víspera']
+
+      - name: total_registros
+        data_type: number(38,0)
+        description: "Número total de registros de horas extra del tipo de día."
+
+      - name: empleados_distintos
+        data_type: number(38,0)
+        description: "Número de empleados distintos con horas extra en ese tipo de día."
+
+      - name: total_horas_diurnas
+        data_type: number(38,0)
+        description: "Total de horas diurnas realizadas en el tipo de día."
+
+      - name: total_horas_nocturnas
+        data_type: number(38,0)
+        description: "Total de horas nocturnas realizadas en el tipo de día."
+
+      - name: total_horas
+        data_type: number(38,0)
+        description: "Total de horas en el tipo de día."
+
+      - name: coste_diurno
+        data_type: number(38,2)
+        description: "Coste total diurno en el tipo de día."
+
+      - name: coste_nocturno
+        data_type: number(38,2)
+        description: "Coste total nocturno en el tipo de día."
+
+      - name: coste_total
+        data_type: number(38,2)
+        description: "Coste total de las horas extra en el tipo de día."
+
+      - name: media_horas_por_registro
+        data_type: number(38,2)
+        description: "Media de horas por registro en el tipo de día."
+
+      - name: media_coste_por_registro
+        data_type: number(38,2)
+        description: "Media de coste por registro en el tipo de día."
+
+      - name: coste_medio_por_hora
+        data_type: number(38,2)
+        description: "Coste medio por hora en el tipo de día. Permite comparar tarifa efectiva entre franjas."
+
+      - name: pct_coste_sobre_total
+        data_type: number(38,2)
+        description: "Porcentaje del coste del tipo de día sobre el coste total del periodo."
+
+      - name: pct_horas_sobre_total
+        data_type: number(38,2)
+        description: "Porcentaje de horas del tipo de día sobre el total de horas del periodo."
+
+  - name: horas_extra_ranking_brigadas
+    description: >
+      Modelo analítico que agrega horas extra por brigada de guardia. La brigada
+      asociada corresponde a la que tenía guardia el día en que se realizó la
+      hora extra (vía brigada_key de fact_horas_extra → dim_brigada). Permite
+      identificar qué brigadas generan más gasto y cómo se distribuye éste
+      entre tipos de día. Periodo analizado: 2026-01-01 a 2026-05-05.
+    config:
+      contract:
+        enforced: true
+      group: costes
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_costes
+        - presentation_portfolio
+      meta:
+        owner: "Jefatura del Cuerpo de Bomberos de Granada"
+        domain: costes
+        criticality: medium
+        grain: "una fila por brigada"
+        use_case: "ranking_brigadas_coste_horas_extra"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_horas = total_horas_diurnas + total_horas_nocturnas"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "ABS(coste_total - (coste_diurno + coste_nocturno)) <= 0.05"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "ABS(coste_total - (coste_festivo + coste_prefestivo + coste_laborable + coste_festivo_vispera)) <= 0.05"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_horas >= 0 AND coste_total >= 0"
+
+    columns:
+      - name: id_brigada
+        data_type: number(38,0)
+        description: "ID natural de la brigada."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+
+      - name: nombre_brigada
+        data_type: varchar
+        description: "Nombre de la brigada (A, B, ..., F, Vacaciones, Módulo, etc.)."
+
+      - name: es_especial
+        data_type: boolean
+        description: "TRUE si la brigada es especial (no operativa de servicio: Vacaciones, Bajas, Módulo, etc.)."
+
+      - name: es_brigada_servicio
+        data_type: boolean
+        description: "TRUE si la brigada cubre guardia operativa de servicio."
+
+      - name: nombre_parque
+        data_type: varchar
+        description: "Parque al que pertenece la brigada."
+
+      - name: total_registros
+        data_type: number(38,0)
+        description: "Número total de registros de horas extra realizadas durante guardias de la brigada."
+
+      - name: empleados_distintos
+        data_type: number(38,0)
+        description: "Número de empleados distintos con horas extra durante guardias de la brigada."
+
+      - name: total_horas_diurnas
+        data_type: number(38,0)
+        description: "Total de horas diurnas realizadas durante guardias de la brigada."
+
+      - name: total_horas_nocturnas
+        data_type: number(38,0)
+        description: "Total de horas nocturnas realizadas durante guardias de la brigada."
+
+      - name: total_horas
+        data_type: number(38,0)
+        description: "Total de horas (diurnas + nocturnas) durante guardias de la brigada."
+
+      - name: coste_diurno
+        data_type: number(38,2)
+        description: "Coste total diurno durante guardias de la brigada."
+
+      - name: coste_nocturno
+        data_type: number(38,2)
+        description: "Coste total nocturno durante guardias de la brigada."
+
+      - name: coste_total
+        data_type: number(38,2)
+        description: "Coste total durante guardias de la brigada."
+
+      - name: coste_festivo
+        data_type: number(38,2)
+        description: "Coste acumulado en días festivos."
+
+      - name: coste_prefestivo
+        data_type: number(38,2)
+        description: "Coste acumulado en días prefestivos."
+
+      - name: coste_laborable
+        data_type: number(38,2)
+        description: "Coste acumulado en días laborables."
+
+      - name: coste_festivo_vispera
+        data_type: number(38,2)
+        description: "Coste acumulado en días festivos víspera."
+
+      - name: media_coste_por_registro
+        data_type: number(38,2)
+        description: "Coste medio por registro de hora extra de la brigada."
+
+      - name: media_horas_por_registro
+        data_type: number(38,2)
+        description: "Horas medias por registro de la brigada."
+
+      - name: coste_medio_por_hora
+        data_type: number(38,2)
+        description: "Coste medio por hora trabajada en guardias de la brigada."
+
+      - name: pct_coste_sobre_total
+        data_type: number(38,2)
+        description: "Porcentaje del coste de la brigada sobre el coste total del periodo."
+
+      - name: pct_horas_sobre_total
+        data_type: number(38,2)
+        description: "Porcentaje de horas de la brigada sobre el total de horas del periodo."
+
+      - name: ranking_coste
+        data_type: number(38,0)
+        description: "Ranking absoluto por coste total. 1 = brigada con más coste."
+
+      - name: ranking_horas
+        data_type: number(38,0)
+        description: "Ranking absoluto por total de horas. 1 = brigada con más horas."
+
+  - name: horas_extra_ranking_empleados
+    description: >
+      Modelo analítico que agrega horas extra por empleado. La categoría y el
+      puesto se resuelven con SCD2 point-in-time (versión vigente en la fecha
+      del hecho), por lo que un bombero promocionado durante el periodo
+      acumula horas separadamente bajo cada puesto histórico. Incluye rankings
+      dentro del puesto, ranking global y z-score sobre el puesto para detectar
+      outliers. Periodo analizado: 2026-01-01 a 2026-05-05.
+    config:
+      contract:
+        enforced: true
+      group: costes
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_costes
+        - scd2
+        - presentation_portfolio
+      meta:
+        owner: "Jefatura del Cuerpo de Bomberos de Granada"
+        domain: costes
+        criticality: medium
+        grain: "una fila por empleado y puesto histórico"
+        use_case: "ranking_empleados_horas_extra_por_puesto"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_horas = total_horas_diurnas + total_horas_nocturnas"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "ABS(coste_total - (coste_diurno + coste_nocturno)) <= 0.05"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "ABS(total_horas - (horas_festivo + horas_prefestivo + horas_laborable + horas_festivo_vispera)) <= 0.05"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_horas >= 0 AND coste_total >= 0"
+
+    columns:
+      - name: id_empleado
+        data_type: number(38,0)
+        description: "ID natural del empleado."
+        constraints:
+          - type: not_null
+        data_tests:
+          - not_null
+
+      - name: nombre_token
+        data_type: varchar
+        description: "Nombre anonimizado/tokenizado del empleado."
+
+      - name: categoria_puesto
+        data_type: varchar
+        description: "Categoría histórica del puesto del empleado en el momento de las horas extra (Tropa, Mando, Administrativo, desconocido)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Tropa', 'Mando', 'Administrativo', 'desconocido']
+
+      - name: puesto
+        data_type: varchar
+        description: "Puesto histórico del empleado en el momento de las horas extra."
+
+      - name: total_registros
+        data_type: number(38,0)
+        description: "Número total de registros de horas extra del empleado en el puesto."
+
+      - name: total_horas_diurnas
+        data_type: number(38,0)
+        description: "Total de horas diurnas del empleado."
+
+      - name: total_horas_nocturnas
+        data_type: number(38,0)
+        description: "Total de horas nocturnas del empleado."
+
+      - name: total_horas
+        data_type: number(38,0)
+        description: "Total de horas del empleado."
+
+      - name: coste_diurno
+        data_type: number(38,2)
+        description: "Coste total diurno del empleado."
+
+      - name: coste_nocturno
+        data_type: number(38,2)
+        description: "Coste total nocturno del empleado."
+
+      - name: coste_total
+        data_type: number(38,2)
+        description: "Coste total acumulado por el empleado."
+
+      - name: horas_festivo
+        data_type: number(38,0)
+        description: "Horas acumuladas en días festivos."
+
+      - name: horas_prefestivo
+        data_type: number(38,0)
+        description: "Horas acumuladas en días prefestivos."
+
+      - name: horas_laborable
+        data_type: number(38,0)
+        description: "Horas acumuladas en días laborables."
+
+      - name: horas_festivo_vispera
+        data_type: number(38,0)
+        description: "Horas acumuladas en días festivos víspera."
+
+      - name: media_horas_por_registro
+        data_type: number(38,2)
+        description: "Media de horas por registro del empleado."
+
+      - name: media_coste_por_registro
+        data_type: number(38,2)
+        description: "Media de coste por registro del empleado."
+
+      - name: ranking_coste_dentro_puesto
+        data_type: number(38,0)
+        description: "Ranking del empleado por coste total dentro de su puesto. 1 = el que más coste genera del puesto."
+
+      - name: ranking_horas_dentro_puesto
+        data_type: number(38,0)
+        description: "Ranking del empleado por horas totales dentro de su puesto."
+
+      - name: ranking_coste_global
+        data_type: number(38,0)
+        description: "Ranking absoluto por coste total sobre todo el cuerpo, sin separar por puesto."
+
+      - name: coste_medio_puesto
+        data_type: number(38,2)
+        description: "Coste medio del puesto al que pertenece el empleado. Permite contextualizar su posición."
+
+      - name: horas_medias_puesto
+        data_type: number(38,2)
+        description: "Horas medias del puesto al que pertenece el empleado."
+
+      - name: desviacion_coste_puesto
+        data_type: number(38,2)
+        description: "Desviación típica del coste dentro del puesto. Base para z-score."
+
+      - name: empleados_en_puesto
+        data_type: number(38,0)
+        description: "Número de empleados con horas extra en el mismo puesto."
+
+      - name: pct_coste_sobre_puesto
+        data_type: number(38,2)
+        description: "Porcentaje del coste del empleado sobre el coste total de su puesto."
+
+      - name: z_score_coste_puesto
+        data_type: number(38,2)
+        description: "Z-score del coste del empleado respecto a la media de su puesto. >2 indica outlier alto, <-2 outlier bajo."

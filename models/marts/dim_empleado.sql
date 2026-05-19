@@ -33,7 +33,7 @@ unknown_row AS (
         , 'DESCONOCIDO'::VARCHAR AS nombre_token
         , 'desconocido'::VARCHAR AS tipo_usuario
         , 'desconocido'::VARCHAR AS puesto
-        , 'desconocido'::VARCHAR AS categoria_puesto
+        , 'Desconocido'::VARCHAR AS categoria_puesto
         , CAST(FALSE AS BOOLEAN) AS es_mando_especial
         , '1900-01-01'::TIMESTAMP_NTZ AS fecha_inicio_validez
         , NULL::TIMESTAMP_NTZ AS fecha_fin_validez
