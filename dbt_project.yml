@@ -29,6 +29,8 @@ vars:
   # Ventana de reprocesamiento incremental (días). Aplica a facts
   # incrementales para capturar correcciones retroactivas del OLTP.
   reprocess_days: 7
+  calendar_start_date: '2020-01-01'
+  calendar_end_date: '2030-12-31'
 
 models:
   bomberos_dw:
