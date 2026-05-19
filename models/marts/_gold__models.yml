@@ -319,7 +319,7 @@ models:
         description: "TRUE si es laborable (incluye días L-V sin info de guardia)."
       - name: es_fin_de_semana
         data_type: boolean
-        description: "TRUE si tipo_dia='fin de semana'."
+        description: "TRUE si la fecha cae en sábado o domingo, independientemente del tipo_dia operativo."
 
   - name: dim_empleado
     description: "Dimensión de empleados SCD Tipo 2. Cada cambio de puesto o rol genera una nueva versión."
@@ -374,7 +374,7 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: ['Tropa', 'Mando', 'Administrativo', 'desconocido']
+                values: ['Tropa', 'Mando', 'Administrativo', 'Desconocido']
       - name: es_mando_especial
         data_type: boolean
         description: "TRUE si es mando especial."
@@ -609,6 +609,10 @@ models:
       - name: fecha_actualizacion
         data_type: timestamp_ntz
         description: "Fecha de última actualización."
+
+      - name: fecha_carga_bronze
+        data_type: timestamp_ntz
+        description: "Timestamp de carga del registro en la capa Bronze."
   
     
   - name: fact_solicitudes
@@ -831,6 +835,10 @@ models:
       - name: fecha_actualizacion
         data_type: timestamp_ntz
         description: "Fecha de última actualización."
+
+      - name: fecha_carga_bronze
+        data_type: timestamp_ntz
+        description: "Timestamp de carga del registro en la capa Bronze."
   - name: fact_asignaciones_operativas
     description: >
       Tabla de hechos de asignaciones operativas de bomberos. Una fila por
@@ -1010,6 +1018,10 @@ models:
       - name: fecha_actualizacion
         data_type: timestamp_ntz
         description: "Fecha de última actualización."
+
+      - name: fecha_carga_bronze
+        data_type: timestamp_ntz
+        description: "Timestamp de carga del registro en la capa Bronze."
   - name: fact_incidencias
     description: |
       Tabla de hechos de incidencias. Dos role-playing dimensions sobre dim_empleado:
@@ -1123,18 +1135,17 @@ models:
 
       - name: empleado_resolutor_key
         data_type: varchar
-        description: "FK a dim_empleado SCD2 (rol: resolutor). Resuelto con fecha_actualizacion si estado='resuelta'; '-1' en otro caso."
+        description: "FK a dim_empleado SCD2 (rol: resolutor). Solo se informa cuando la incidencia está resuelta y tiene empleado resolutor."
         entity:
           name: empleado_resolutor
           type: foreign
-        constraints:
-          - type: not_null
         data_tests:
-          - not_null
           - relationships:
               arguments:
                 to: ref('dim_empleado')
                 field: empleado_key
+              config:
+                where: "empleado_resolutor_key IS NOT NULL"
 
       - name: fecha_key
         data_type: varchar
@@ -1159,17 +1170,31 @@ models:
 
       - name: vehiculo_key
         data_type: varchar
-        description: "FK a dim_vehiculo (solo si tipo=vehiculo)."
+        description: "FK a dim_vehiculo. Solo se informa cuando la incidencia tiene vehículo asociado."
         entity:
           name: vehiculo
           type: foreign
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_vehiculo')
+                field: vehiculo_key
+              config:
+                where: "vehiculo_key IS NOT NULL"
 
       - name: equipo_key
         data_type: varchar
-        description: "FK a dim_equipo (solo si tipo=equipo)."
+        description: "FK a dim_equipo. Solo se informa cuando la incidencia tiene equipo asociado."
         entity:
           name: equipo
           type: foreign
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_equipo')
+                field: equipo_key
+              config:
+                where: "equipo_key IS NOT NULL"
 
       - name: id_incidencia
         data_type: number(38,0)
@@ -1224,13 +1249,15 @@ models:
 
       - name: nivel_gravedad
         data_type: varchar
-        description: "Nivel: bajo, medio, alto."
+        description: "Nivel: bajo, medio o alto. Puede ser NULL en incidencias históricas sin gravedad informada."
         dimension:
           type: categorical
         data_tests:
           - accepted_values:
               arguments:
-                values: ['bajo', 'medio', 'alto', '']
+                values: ['bajo', 'medio', 'alto']
+              config:
+                where: "nivel_gravedad IS NOT NULL"
 
       - name: esta_leido
         data_type: boolean
@@ -1265,6 +1292,10 @@ models:
       - name: fecha_actualizacion
         data_type: timestamp_ntz
         description: "Fecha de última actualización."
+
+      - name: fecha_carga_bronze
+        data_type: timestamp_ntz
+        description: "Timestamp de carga del registro en la capa Bronze."
 
   - name: dim_time
     description: "Time spine diaria para MetricFlow. Una fila por día desde 2020 a 2030. Necesaria para resolución de granularidades y métricas cumulative."
