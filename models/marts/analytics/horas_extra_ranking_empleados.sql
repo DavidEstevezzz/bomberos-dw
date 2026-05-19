@@ -26,7 +26,7 @@ WITH horas_extra AS (
     FROM {{ ref('fact_horas_extra') }} f
     LEFT JOIN {{ ref('dim_empleado') }} e
         ON f.empleado_key = e.empleado_key
-    WHERE f.fecha >= '2026-01-01'
+    WHERE f.fecha >= '2025-05-05'
       AND f.fecha < '2026-05-05'
 ),
 
@@ -106,7 +106,7 @@ con_ranking AS (
         ROUND(
             STDDEV(coste_total) OVER (PARTITION BY puesto),
             2
-        ) AS desviacion_coste_puesto,
+        )::NUMBER(38,2) AS desviacion_coste_puesto,
 
         COUNT(*) OVER (PARTITION BY puesto) AS empleados_en_puesto,
 
@@ -125,7 +125,7 @@ con_ranking AS (
             (coste_total - AVG(coste_total) OVER (PARTITION BY puesto))
                 / NULLIF(STDDEV(coste_total) OVER (PARTITION BY puesto), 0),
             2
-        ) AS z_score_coste_puesto
+        )::NUMBER(38,2) AS z_score_coste_puesto
 
     FROM agregado_empleado a
 )

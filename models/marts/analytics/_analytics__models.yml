@@ -960,3 +960,740 @@ models:
       - name: z_score_coste_puesto
         data_type: number(38,2)
         description: "Z-score del coste del empleado respecto a la media de su puesto. >2 indica outlier alto, <-2 outlier bajo."
+  
+  - name: incidencias_eficiencia_resolucion
+    description: >
+      Modelo analítico que agrega incidencias por tipo y nivel de gravedad para
+      analizar eficiencia operativa. Una fila por combinación tipo × nivel_gravedad.
+      Permite comparar tiempo medio y mediano de resolución (MTTR), tasas de resolución
+      y dispersión de los tiempos. Las incidencias sin nivel se agrupan bajo
+      'sin_clasificar' para cuantificar el agujero de calidad de datos.
+      Periodo analizado: 2026-01-01 a 2026-05-05.
+    config:
+      contract:
+        enforced: true
+      group: mantenimiento
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_mantenimiento
+        - presentation_portfolio
+      meta:
+        owner: "Mantenimiento - Bomberos Granada"
+        domain: mantenimiento
+        criticality: medium
+        grain: "una fila por tipo_incidencia y nivel_gravedad"
+        use_case: "eficiencia_resolucion_por_tipo_y_gravedad"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_resueltas + total_tramitadas + total_pendientes = total_incidencias"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_incidencias >= 0"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "pct_resueltas + pct_tramitadas + pct_pendientes BETWEEN 99.5 AND 100.5"
+          config:
+            severity: warn
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "dias_resolucion_min >= 0"
+          config:
+            where: "dias_resolucion_min IS NOT NULL"
+
+    columns:
+      - name: tipo_incidencia
+        data_type: varchar
+        description: "Tipo de incidencia (vehiculo, personal, equipo, instalacion, vestuario, equipos_comunes)."
+        constraints:
+          - type: not_null
+        data_tests:
+          - not_null
+
+      - name: nivel_gravedad
+        data_type: varchar
+        description: "Nivel de gravedad (bajo, medio, alto). 'sin_clasificar' para incidencias históricas sin nivel."
+        constraints:
+          - type: not_null
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['bajo', 'medio', 'alto', 'sin_clasificar']
+
+      - name: total_incidencias
+        data_type: number(38,0)
+        description: "Número total de incidencias del tipo y nivel."
+
+      - name: total_resueltas
+        data_type: number(38,0)
+        description: "Total de incidencias resueltas."
+
+      - name: total_tramitadas
+        data_type: number(38,0)
+        description: "Total de incidencias en trámite."
+
+      - name: total_pendientes
+        data_type: number(38,0)
+        description: "Total de incidencias pendientes."
+
+      - name: pct_resueltas
+        data_type: number(38,2)
+        description: "Porcentaje de incidencias resueltas sobre el total del grupo."
+
+      - name: pct_tramitadas
+        data_type: number(38,2)
+        description: "Porcentaje de incidencias tramitadas sobre el total del grupo."
+
+      - name: pct_pendientes
+        data_type: number(38,2)
+        description: "Porcentaje de incidencias pendientes sobre el total del grupo."
+
+      - name: mttr_dias_medio
+        data_type: number(38,2)
+        description: "Tiempo medio de resolución en días (Mean Time To Resolution). Solo sobre incidencias resueltas."
+
+      - name: mttr_dias_mediana
+        data_type: number(38,2)
+        description: "Mediana del tiempo de resolución en días. Robusto frente a outliers."
+
+      - name: dias_resolucion_min
+        data_type: number(38,0)
+        description: "Mínimo de días de resolución observados en el grupo."
+
+      - name: dias_resolucion_max
+        data_type: number(38,0)
+        description: "Máximo de días de resolución observados en el grupo."
+
+      - name: desviacion_mttr
+        data_type: number(38,2)
+        description: "Desviación típica del tiempo de resolución. Indica consistencia."
+
+      - name: categoria_mttr
+        data_type: varchar
+        description: "Categorización del MTTR: rapido (≤3), normal (≤7), lento (≤14), muy_lento (>14), sin_datos."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['rapido', 'normal', 'lento', 'muy_lento', 'sin_datos']
+
+  - name: incidencias_ranking_resolutores
+    description: >
+      Modelo analítico que rankea bomberos por capacidad de resolución de incidencias.
+      El puesto y la categoría se resuelven con SCD2 point-in-time vigente en el momento
+      de la resolución, no en el actual. Incluye rankings global, por parque y por puesto,
+      MTTR personal, distribución por tipo y nivel de gravedad. Solo considera
+      incidencias con estado='resuelta' y resolutor conocido.
+      Periodo analizado: 2026-01-01 a 2026-05-05.
+    config:
+      contract:
+        enforced: true
+      group: mantenimiento
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_mantenimiento
+        - scd2
+        - presentation_portfolio
+      meta:
+        owner: "Mantenimiento - Bomberos Granada"
+        domain: mantenimiento
+        criticality: medium
+        grain: "una fila por empleado resolutor"
+        use_case: "ranking_resolutores_incidencias"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_resueltas >= 1"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(resueltas_vehiculo + resueltas_personal + resueltas_equipo + resueltas_instalacion + resueltas_vestuario + resueltas_equipos_comunes) = total_resueltas"
+          config:
+            severity: warn
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(resueltas_alta_gravedad + resueltas_media_gravedad + resueltas_baja_gravedad) <= total_resueltas"
+
+    columns:
+      - name: id_empleado_resolutor
+        data_type: number(38,0)
+        description: "ID natural del bombero resolutor."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+
+      - name: nombre_token
+        data_type: varchar
+        description: "Nombre anonimizado/tokenizado."
+
+      - name: categoria_puesto
+        data_type: varchar
+        description: "Categoría histórica del puesto en el momento de la resolución."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Tropa', 'Mando', 'Administrativo', 'desconocido']
+
+      - name: puesto
+        data_type: varchar
+        description: "Puesto histórico del bombero en el momento de la resolución."
+
+      - name: nombre_parque
+        data_type: varchar
+        description: "Parque al que pertenece la incidencia resuelta."
+
+      - name: total_resueltas
+        data_type: number(38,0)
+        description: "Total de incidencias resueltas por el bombero."
+
+      - name: resueltas_vehiculo
+        data_type: number(38,0)
+        description: "Incidencias de vehículo resueltas."
+
+      - name: resueltas_personal
+        data_type: number(38,0)
+        description: "Incidencias de personal resueltas."
+
+      - name: resueltas_equipo
+        data_type: number(38,0)
+        description: "Incidencias de equipo personal resueltas."
+
+      - name: resueltas_instalacion
+        data_type: number(38,0)
+        description: "Incidencias de instalación resueltas."
+
+      - name: resueltas_vestuario
+        data_type: number(38,0)
+        description: "Incidencias de vestuario resueltas."
+
+      - name: resueltas_equipos_comunes
+        data_type: number(38,0)
+        description: "Incidencias de equipos comunes resueltas."
+
+      - name: resueltas_alta_gravedad
+        data_type: number(38,0)
+        description: "Incidencias de gravedad alta resueltas."
+
+      - name: resueltas_media_gravedad
+        data_type: number(38,0)
+        description: "Incidencias de gravedad media resueltas."
+
+      - name: resueltas_baja_gravedad
+        data_type: number(38,0)
+        description: "Incidencias de gravedad baja resueltas."
+
+      - name: mttr_personal
+        data_type: number(38,2)
+        description: "MTTR personal del resolutor (media de días de resolución)."
+
+      - name: mttr_personal_mediana
+        data_type: number(38,2)
+        description: "Mediana del tiempo de resolución del resolutor. Robusto frente a outliers."
+
+      - name: dias_resolucion_min
+        data_type: number(38,0)
+        description: "Mínimo de días empleados en una resolución."
+
+      - name: dias_resolucion_max
+        data_type: number(38,0)
+        description: "Máximo de días empleados en una resolución."
+
+      - name: ranking_total_global
+        data_type: number(38,0)
+        description: "Ranking absoluto por total de incidencias resueltas."
+
+      - name: ranking_total_dentro_parque
+        data_type: number(38,0)
+        description: "Ranking por volumen dentro del parque."
+
+      - name: ranking_total_dentro_puesto
+        data_type: number(38,0)
+        description: "Ranking por volumen dentro del puesto. Comparación justa entre iguales."
+
+      - name: ranking_velocidad_global
+        data_type: number(38,0)
+        description: "Ranking por MTTR ascendente (1 = más rápido). Solo se rankea con ≥3 resoluciones para evitar sesgo."
+
+      - name: mttr_medio_puesto
+        data_type: number(38,2)
+        description: "MTTR medio del puesto del resolutor. Permite ver si está por encima o por debajo de su grupo."
+
+      - name: mttr_medio_parque
+        data_type: number(38,2)
+        description: "MTTR medio del parque."
+
+      - name: resolutores_en_puesto
+        data_type: number(38,0)
+        description: "Número de resolutores con resoluciones en el mismo puesto."
+
+      - name: resolutores_en_parque
+        data_type: number(38,0)
+        description: "Número de resolutores con resoluciones en el mismo parque."
+
+      - name: pct_resueltas_sobre_parque
+        data_type: number(38,2)
+        description: "Porcentaje de incidencias del parque resueltas por este bombero."
+
+  - name: incidencias_top_vehiculos
+    description: >
+      Modelo analítico que identifica los vehículos problemáticos según su volumen
+      e incidencias por nivel de gravedad. Una fila por vehículo registrado (matrícula).
+      Incluye rankings y clasificación operativa (critico / problematico / normal / bajo_volumen)
+      basada en umbrales relativos a la media de la flota.
+      Periodo analizado: 2026-01-01 a 2026-05-05.
+    config:
+      contract:
+        enforced: true
+      group: mantenimiento
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_mantenimiento
+        - presentation_portfolio
+      meta:
+        owner: "Mantenimiento - Bomberos Granada"
+        domain: mantenimiento
+        criticality: medium
+        grain: "una fila por matrícula de vehículo"
+        use_case: "ranking_vehiculos_incidencias"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_resueltas + total_tramitadas + total_pendientes = total_incidencias"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(incidencias_alta_gravedad + incidencias_media_gravedad + incidencias_baja_gravedad + incidencias_sin_clasificar) = total_incidencias"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "pct_resueltas BETWEEN 0 AND 100"
+
+    columns:
+      - name: matricula_vehiculo
+        data_type: varchar
+        description: "Matrícula tokenizada del vehículo."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+
+      - name: nombre_vehiculo
+        data_type: varchar
+        description: "Nombre del vehículo."
+
+      - name: tipo_vehiculo
+        data_type: varchar
+        description: "Tipo de vehículo."
+
+      - name: anio_vehiculo
+        data_type: number(38,0)
+        description: "Año del vehículo."
+
+      - name: nombre_parque
+        data_type: varchar
+        description: "Parque al que está asignado el vehículo."
+
+      - name: total_incidencias
+        data_type: number(38,0)
+        description: "Total de incidencias del vehículo."
+
+      - name: total_resueltas
+        data_type: number(38,0)
+        description: "Total de incidencias resueltas."
+
+      - name: total_tramitadas
+        data_type: number(38,0)
+        description: "Total de incidencias tramitadas."
+
+      - name: total_pendientes
+        data_type: number(38,0)
+        description: "Total de incidencias pendientes."
+
+      - name: incidencias_alta_gravedad
+        data_type: number(38,0)
+        description: "Número de incidencias de gravedad alta."
+
+      - name: incidencias_media_gravedad
+        data_type: number(38,0)
+        description: "Número de incidencias de gravedad media."
+
+      - name: incidencias_baja_gravedad
+        data_type: number(38,0)
+        description: "Número de incidencias de gravedad baja."
+
+      - name: incidencias_sin_clasificar
+        data_type: number(38,0)
+        description: "Número de incidencias sin nivel de gravedad informado."
+
+      - name: pct_resueltas
+        data_type: number(38,2)
+        description: "Porcentaje de incidencias del vehículo que se resolvieron."
+
+      - name: pct_pendientes
+        data_type: number(38,2)
+        description: "Porcentaje de incidencias del vehículo que siguen pendientes."
+
+      - name: mttr_vehiculo
+        data_type: number(38,2)
+        description: "MTTR medio del vehículo."
+
+      - name: mttr_vehiculo_mediana
+        data_type: number(38,2)
+        description: "Mediana del tiempo de resolución."
+
+      - name: dias_resolucion_min
+        data_type: number(38,0)
+        description: "Mínimo de días observado en resoluciones del vehículo."
+
+      - name: dias_resolucion_max
+        data_type: number(38,0)
+        description: "Máximo de días observado en resoluciones del vehículo."
+
+      - name: ranking_volumen_global
+        data_type: number(38,0)
+        description: "Ranking absoluto del vehículo por volumen de incidencias. 1 = más incidencias."
+
+      - name: ranking_volumen_dentro_parque
+        data_type: number(38,0)
+        description: "Ranking del vehículo dentro de su parque."
+
+      - name: ranking_volumen_dentro_tipo
+        data_type: number(38,0)
+        description: "Ranking del vehículo dentro de su tipo (camión, furgoneta, etc.)."
+
+      - name: ranking_criticidad
+        data_type: number(38,0)
+        description: "Ranking compuesto: ordena primero por incidencias graves, luego por volumen total."
+
+      - name: media_incidencias_flota
+        data_type: number(38,2)
+        description: "Media de incidencias por vehículo en toda la flota. Base para clasificación."
+
+      - name: categoria_vehiculo
+        data_type: varchar
+        description: "Clasificación operativa: critico, problematico, normal, bajo_volumen."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['critico', 'problematico', 'normal', 'bajo_volumen']
+
+  - name: incidencias_equipos_top
+    description: >
+      Modelo analítico que identifica los equipos personales registrados con más
+      incidencias. Una fila por id_equipo. Solo considera equipos registrados en
+      la dim (los equipos comunes registrados como texto libre quedan fuera por
+      ser una entidad distinta). Incluye rankings dentro de la categoría (más justo
+      que el global porque cada categoría tiene patrones de uso muy distintos).
+      Periodo analizado: 2026-01-01 a 2026-05-05.
+    config:
+      contract:
+        enforced: true
+      group: mantenimiento
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_mantenimiento
+        - presentation_portfolio
+      meta:
+        owner: "Mantenimiento - Bomberos Granada"
+        domain: mantenimiento
+        criticality: medium
+        grain: "una fila por equipo personal registrado"
+        use_case: "ranking_equipos_incidencias"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_resueltas + total_tramitadas + total_pendientes = total_incidencias"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(incidencias_alta_gravedad + incidencias_media_gravedad + incidencias_baja_gravedad + incidencias_sin_clasificar) = total_incidencias"
+
+    columns:
+      - name: id_equipo
+        data_type: number(38,0)
+        description: "ID natural del equipo."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+
+      - name: nombre_equipo
+        data_type: varchar
+        description: "Nombre del equipo."
+
+      - name: categoria_equipo
+        data_type: varchar
+        description: "Categoría del equipo (EPI, herramienta, comunicaciones, etc.)."
+
+      - name: esta_disponible
+        data_type: boolean
+        description: "TRUE si el equipo sigue disponible. FALSE si fue retirado."
+
+      - name: nombre_parque
+        data_type: varchar
+        description: "Parque al que está asignado el equipo."
+
+      - name: total_incidencias
+        data_type: number(38,0)
+        description: "Total de incidencias del equipo."
+
+      - name: total_resueltas
+        data_type: number(38,0)
+        description: "Total de incidencias resueltas."
+
+      - name: total_tramitadas
+        data_type: number(38,0)
+        description: "Total de incidencias tramitadas."
+
+      - name: total_pendientes
+        data_type: number(38,0)
+        description: "Total de incidencias pendientes."
+
+      - name: incidencias_alta_gravedad
+        data_type: number(38,0)
+        description: "Incidencias de gravedad alta."
+
+      - name: incidencias_media_gravedad
+        data_type: number(38,0)
+        description: "Incidencias de gravedad media."
+
+      - name: incidencias_baja_gravedad
+        data_type: number(38,0)
+        description: "Incidencias de gravedad baja."
+
+      - name: incidencias_sin_clasificar
+        data_type: number(38,0)
+        description: "Incidencias sin nivel de gravedad informado."
+
+      - name: pct_resueltas
+        data_type: number(38,2)
+        description: "Porcentaje de resolución del equipo."
+
+      - name: pct_pendientes
+        data_type: number(38,2)
+        description: "Porcentaje de incidencias pendientes."
+
+      - name: mttr_equipo
+        data_type: number(38,2)
+        description: "MTTR medio del equipo."
+
+      - name: mttr_equipo_mediana
+        data_type: number(38,2)
+        description: "Mediana de días de resolución del equipo."
+
+      - name: dias_resolucion_min
+        data_type: number(38,0)
+        description: "Mínimo de días observado."
+
+      - name: dias_resolucion_max
+        data_type: number(38,0)
+        description: "Máximo de días observado."
+
+      - name: ranking_volumen_global
+        data_type: number(38,0)
+        description: "Ranking absoluto por volumen de incidencias."
+
+      - name: ranking_volumen_dentro_categoria
+        data_type: number(38,0)
+        description: "Ranking dentro de su categoría (EPI vs EPI, herramienta vs herramienta). Comparación justa."
+
+      - name: ranking_volumen_dentro_parque
+        data_type: number(38,0)
+        description: "Ranking dentro del parque."
+
+      - name: media_incidencias_categoria
+        data_type: number(38,2)
+        description: "Media de incidencias por equipo dentro de la categoría. Base para clasificación."
+
+      - name: pct_incidencias_sobre_categoria
+        data_type: number(38,2)
+        description: "Porcentaje de las incidencias del equipo sobre el total de su categoría."
+
+      - name: categoria_equipo_riesgo
+        data_type: varchar
+        description: "Clasificación operativa: retirado_problematico, critico, frecuente, normal."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['retirado_problematico', 'critico', 'frecuente', 'normal']
+
+  - name: incidencias_cuello_botella
+    description: >
+      Modelo analítico de incidencias actualmente pendientes o tramitadas, ordenadas
+      por antigüedad. A diferencia de los demás analytics, NO tiene ventana temporal:
+      una incidencia abierta hace meses es justo lo que jefatura quiere ver. Grain
+      por incidencia individual (no agregado). Incluye categoría de antigüedad,
+      prioridad de atención (gravedad + antigüedad) y rankings global, por tipo y
+      por parque. Sirve como lista accionable para reducir el cuello de botella.
+    config:
+      contract:
+        enforced: true
+      group: mantenimiento
+      access: public
+      tags:
+        - analytics
+        - gold
+        - dominio_mantenimiento
+        - presentation_portfolio
+        - accionable
+      meta:
+        owner: "Mantenimiento - Bomberos Granada"
+        domain: mantenimiento
+        criticality: high
+        grain: "una fila por incidencia pendiente o tramitada"
+        use_case: "cuello_botella_incidencias_pendientes"
+
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "dias_atascada >= 0"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "estado IN ('pendiente', 'tramitada')"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "prioridad_atencion BETWEEN 1 AND 7"
+
+    columns:
+      - name: id_incidencia
+        data_type: number(38,0)
+        description: "ID natural de la incidencia."
+        constraints:
+          - type: not_null
+        data_tests:
+          - unique
+          - not_null
+
+      - name: tipo_incidencia
+        data_type: varchar
+        description: "Tipo de la incidencia."
+
+      - name: nivel_gravedad
+        data_type: varchar
+        description: "Nivel de gravedad (incluye 'sin_clasificar' para incidencias sin nivel informado)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['bajo', 'medio', 'alto', 'sin_clasificar']
+
+      - name: estado
+        data_type: varchar
+        description: "Estado actual: pendiente o tramitada (las resueltas están fuera del modelo)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['pendiente', 'tramitada']
+
+      - name: fecha_incidencia
+        data_type: date
+        description: "Fecha en que ocurrió la incidencia."
+
+      - name: fecha_creacion
+        data_type: timestamp_ntz
+        description: "Timestamp de creación del registro."
+
+      - name: fecha_actualizacion
+        data_type: timestamp_ntz
+        description: "Timestamp de última actualización."
+
+      - name: id_parque
+        data_type: number(38,0)
+        description: "ID del parque."
+
+      - name: id_empleado_creador
+        data_type: number(38,0)
+        description: "ID del bombero que creó la incidencia."
+
+      - name: matricula_vehiculo
+        data_type: varchar
+        description: "Matrícula del vehículo, si aplica."
+
+      - name: id_equipo
+        data_type: number(38,0)
+        description: "ID del equipo, si aplica."
+
+      - name: nombre_equipo_comun
+        data_type: varchar
+        description: "Nombre del equipo común (texto libre), si aplica."
+
+      - name: dias_atascada
+        data_type: number(38,0)
+        description: "Días transcurridos desde fecha_creacion hasta hoy. Medida principal del cuello de botella."
+
+      - name: creador_nombre_token
+        data_type: varchar
+        description: "Nombre tokenizado del creador."
+
+      - name: creador_puesto
+        data_type: varchar
+        description: "Puesto histórico del creador en el momento de la creación."
+
+      - name: creador_categoria_puesto
+        data_type: varchar
+        description: "Categoría histórica del puesto del creador."
+
+      - name: nombre_parque
+        data_type: varchar
+        description: "Parque de la incidencia."
+
+      - name: nombre_vehiculo
+        data_type: varchar
+        description: "Nombre del vehículo, si aplica."
+
+      - name: tipo_vehiculo
+        data_type: varchar
+        description: "Tipo de vehículo, si aplica."
+
+      - name: nombre_equipo
+        data_type: varchar
+        description: "Nombre del equipo personal, si aplica."
+
+      - name: categoria_equipo
+        data_type: varchar
+        description: "Categoría del equipo personal, si aplica."
+
+      - name: categoria_antiguedad
+        data_type: varchar
+        description: "Categoría de antigüedad: reciente, una_semana_a_un_mes, mes_a_trimestre, trimestre_a_semestre, muy_antigua."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['reciente', 'una_semana_a_un_mes', 'mes_a_trimestre', 'trimestre_a_semestre', 'muy_antigua']
+
+      - name: prioridad_atencion
+        data_type: number(38,0)
+        description: "Prioridad operativa de 1 (máxima) a 7 (mínima), combinando gravedad y antigüedad."
+
+      - name: ranking_antiguedad_global
+        data_type: number(38,0)
+        description: "Posición global ordenada por días atascada (descendente)."
+
+      - name: ranking_antiguedad_dentro_tipo
+        data_type: number(38,0)
+        description: "Posición dentro del tipo_incidencia."
+
+      - name: ranking_antiguedad_dentro_parque
+        data_type: number(38,0)
+        description: "Posición dentro del parque."
