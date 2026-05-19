@@ -85,7 +85,12 @@ final AS (
         -- Role-playing dimensions: dos FKs distintas hacia la misma dim_fecha.
         -- Permite queries como "duración media entre solicitud y aprobación"
         -- sin necesidad de mantener dos dimensiones físicas.
-        , {{ dbt_utils.generate_surrogate_key(['fecha_inicio']) }} AS fecha_inicio_key
+        , CASE
+            WHEN fecha_inicio IS NOT NULL
+            THEN {{ dbt_utils.generate_surrogate_key(['fecha_inicio']) }}
+            ELSE NULL
+          END AS fecha_inicio_key
+
         , CASE 
             WHEN fecha_fin IS NOT NULL 
             THEN {{ dbt_utils.generate_surrogate_key(['fecha_fin']) }}
@@ -113,6 +118,7 @@ final AS (
         -- auditoría
         , fecha_creacion
         , fecha_actualizacion
+        , fecha_carga_bronze
     FROM solicitudes_with_empleado
 )
 

@@ -6,23 +6,22 @@ snp_empleado AS (
 
 dim_empleado_real AS (
     SELECT
-        {{ dbt_utils.generate_surrogate_key(['id_empleado', 'dbt_valid_from']) }} AS empleado_key
-        , id_empleado
-        , nombre_token
-        , tipo_usuario
-        , puesto
-        , categoria_puesto
-        , CAST(es_mando_especial AS BOOLEAN) AS es_mando_especial
-        , dbt_valid_from AS fecha_inicio_validez
-        , dbt_valid_to AS fecha_fin_validez
-        , CAST(
-            CASE
-                WHEN dbt_valid_to IS NULL AND COALESCE(dbt_is_deleted, FALSE) = FALSE THEN TRUE
-                ELSE FALSE
-            END
-            AS BOOLEAN
-          ) AS es_version_actual
-        , CAST(COALESCE(dbt_is_deleted, FALSE) AS BOOLEAN) AS es_eliminado
+        {{ dbt_utils.generate_surrogate_key(['id_empleado', 'dbt_valid_from']) }}::VARCHAR AS empleado_key
+        , id_empleado::NUMBER(38,0) AS id_empleado
+        , nombre_token::VARCHAR AS nombre_token
+        , tipo_usuario::VARCHAR AS tipo_usuario
+        , puesto::VARCHAR AS puesto
+        , categoria_puesto::VARCHAR AS categoria_puesto
+        , es_mando_especial::BOOLEAN AS es_mando_especial
+        , dbt_valid_from::TIMESTAMP_NTZ AS fecha_inicio_validez
+        , dbt_valid_to::TIMESTAMP_NTZ AS fecha_fin_validez
+        , CASE
+            WHEN dbt_valid_to IS NULL
+              AND COALESCE(dbt_is_deleted, FALSE) = FALSE
+            THEN TRUE
+            ELSE FALSE
+          END::BOOLEAN AS es_version_actual
+        , COALESCE(dbt_is_deleted, FALSE)::BOOLEAN AS es_eliminado
     FROM snp_empleado
 ),
 

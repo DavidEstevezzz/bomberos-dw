@@ -24,7 +24,7 @@ vehicles_enriched AS (
 ),
 
 -- surrogate key
-dim_vehiculo AS (
+dim_vehiculo_real AS (
     SELECT
         {{ dbt_utils.generate_surrogate_key(['matricula_token']) }} AS vehiculo_key
         , matricula_token
@@ -34,6 +34,20 @@ dim_vehiculo AS (
         , id_parque
         , nombre_parque
     FROM vehicles_enriched
+),
+
+-- Default Dimension Row para hechos sin vehículo conocido
+unknown_row AS (
+    SELECT
+        '-1'::VARCHAR AS vehiculo_key
+        , 'DESCONOCIDO'::VARCHAR AS matricula_token
+        , 'DESCONOCIDO'::VARCHAR AS nombre_vehiculo
+        , 'desconocido'::VARCHAR AS tipo_vehiculo
+        , NULL::NUMBER(38,0) AS anio_vehiculo
+        , -1::NUMBER(38,0) AS id_parque
+        , 'DESCONOCIDO'::VARCHAR AS nombre_parque
 )
 
-SELECT * FROM dim_vehiculo
+SELECT * FROM dim_vehiculo_real
+UNION ALL
+SELECT * FROM unknown_row
