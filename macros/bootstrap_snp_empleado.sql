@@ -4,7 +4,7 @@
   Bootstrap del snapshot SCD2 de empleados.
   
   Inicializa snp_empleado con una versión por empleado fechada en 
-  '2024-01-01' (anterior al primer hecho histórico: 2024-02-13).
+  '1900-01-01' (anterior al primer hecho histórico: 2024-02-13).
   
   Necesario porque dbt snapshot, en su primera ejecución, fecharía 
   dbt_valid_from = NOW() y dejaría todos los hechos históricos huérfanos.
@@ -19,7 +19,7 @@
     dbt run-operation bootstrap_snp_empleado --args '{force: true}'
 #}
 
-{% set bootstrap_date = '2024-01-01 00:00:00' %}
+{% set bootstrap_date = '1900-01-01 00:00:00' %}
 {% set snapshot_schema = target.schema %}
 {% set snapshot_table = target.database ~ '.' ~ snapshot_schema ~ '.snp_empleado' %}
 
