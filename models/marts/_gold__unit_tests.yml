@@ -9,14 +9,17 @@ unit_tests:
       Bombero de Tropa con 8h diurnas + 4h nocturnas en día laborable.
       Precio Tropa: 20€/h diurna, 30€/h nocturna.
       Coste esperado: 8*20 + 4*30 = 160 + 120 = 280€.
+      Se incluyen dos guardias físicas Norte/Sur con el mismo nombre de brigada
+      para validar que la lógica colapsa por nombre_brigada y no duplica horas extra.
     model: fact_horas_extra
     overrides:
       macros:
         is_incremental: false
+
     given:
       - input: ref('stg_bronze__extra_hours')
         rows:
-          - { id_hora_extra: 1, id_empleado: 100, id_salario: 1, fecha: '2024-06-15', horas_diurnas: 8, horas_nocturnas: 4, total_horas: 12, fecha_creacion: '2024-06-15 00:00:00', fecha_actualizacion: '2024-06-15 00:00:00' }
+          - { id_hora_extra: 1, id_empleado: 100, id_salario: 1, fecha: '2024-06-15', horas_diurnas: 8, horas_nocturnas: 4, total_horas: 12, fecha_creacion: '2024-06-15 00:00:00', fecha_actualizacion: '2024-06-15 00:00:00', fecha_carga_bronze: '2024-06-15 01:00:00' }
 
       - input: ref('stg_bronze__salaries')
         rows:
@@ -25,6 +28,12 @@ unit_tests:
       - input: ref('stg_bronze__guards')
         rows:
           - { id_guardia: 999, fecha: '2024-06-15', id_brigada: 5, id_parque: 1, id_salario: 1, tipo_dia: 'laborable' }
+          - { id_guardia: 1000, fecha: '2024-06-15', id_brigada: 50, id_parque: 2, id_salario: 1, tipo_dia: 'laborable' }
+
+      - input: ref('stg_bronze__brigades')
+        rows:
+          - { id_brigada: 5, nombre_brigada: 'Brigada A', es_brigada_servicio: true }
+          - { id_brigada: 50, nombre_brigada: 'Brigada A', es_brigada_servicio: true }
 
       - input: ref('dim_empleado')
         rows:
@@ -34,19 +43,23 @@ unit_tests:
       rows:
         - { id_hora_extra: 1, coste_diurno: 160.00, coste_nocturno: 120.00, coste_total: 280.00, tipo_salario: 'Tropa', tipo_dia: 'laborable' }
 
+
   - name: test_coste_total_subinspector_festivo
     description: >
       Subinspector con 2h diurnas + 22h nocturnas en festivo.
       Precio Subinspector: 30€/h diurna, 45€/h nocturna.
       Coste esperado: 2*30 + 22*45 = 60 + 990 = 1050€.
+      Se incluyen dos guardias físicas Norte/Sur con el mismo nombre de brigada
+      para validar que la lógica colapsa por nombre_brigada y no duplica horas extra.
     model: fact_horas_extra
     overrides:
       macros:
         is_incremental: false
+
     given:
       - input: ref('stg_bronze__extra_hours')
         rows:
-          - { id_hora_extra: 2, id_empleado: 200, id_salario: 2, fecha: '2024-12-25', horas_diurnas: 2, horas_nocturnas: 22, total_horas: 24, fecha_creacion: '2024-12-25 00:00:00', fecha_actualizacion: '2024-12-25 00:00:00' }
+          - { id_hora_extra: 2, id_empleado: 200, id_salario: 2, fecha: '2024-12-25', horas_diurnas: 2, horas_nocturnas: 22, total_horas: 24, fecha_creacion: '2024-12-25 00:00:00', fecha_actualizacion: '2024-12-25 00:00:00', fecha_carga_bronze: '2024-12-25 01:00:00' }
 
       - input: ref('stg_bronze__salaries')
         rows:
@@ -54,7 +67,13 @@ unit_tests:
 
       - input: ref('stg_bronze__guards')
         rows:
-          - { id_guardia: 1000, fecha: '2024-12-25', id_brigada: 5, id_parque: 1, id_salario: 2, tipo_dia: 'festivo' }
+          - { id_guardia: 1001, fecha: '2024-12-25', id_brigada: 6, id_parque: 1, id_salario: 2, tipo_dia: 'festivo' }
+          - { id_guardia: 1002, fecha: '2024-12-25', id_brigada: 60, id_parque: 2, id_salario: 2, tipo_dia: 'festivo' }
+
+      - input: ref('stg_bronze__brigades')
+        rows:
+          - { id_brigada: 6, nombre_brigada: 'Brigada C', es_brigada_servicio: true }
+          - { id_brigada: 60, nombre_brigada: 'Brigada C', es_brigada_servicio: true }
 
       - input: ref('dim_empleado')
         rows:

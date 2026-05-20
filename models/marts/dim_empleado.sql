@@ -4,6 +4,16 @@ snp_empleado AS (
     SELECT * FROM {{ ref('snp_empleado') }}
 ),
 
+snp_empleado_versioned AS (
+    SELECT
+        *
+        , ROW_NUMBER() OVER (
+            PARTITION BY id_empleado
+            ORDER BY dbt_valid_from
+        ) AS numero_version_empleado
+    FROM snp_empleado
+),
+
 dim_empleado_real AS (
     SELECT
         {{ dbt_utils.generate_surrogate_key(['id_empleado', 'dbt_valid_from']) }}::VARCHAR AS empleado_key
@@ -13,16 +23,27 @@ dim_empleado_real AS (
         , puesto::VARCHAR AS puesto
         , categoria_puesto::VARCHAR AS categoria_puesto
         , es_mando_especial::BOOLEAN AS es_mando_especial
-        , dbt_valid_from::TIMESTAMP_NTZ AS fecha_inicio_validez
+
+        -- La primera versión capturada por el snapshot se considera válida
+        -- para todo el histórico anterior, porque el OLTP ya tenía datos
+        -- antes de activar SCD2.
+        , CASE
+            WHEN numero_version_empleado = 1
+            THEN '1900-01-01'::TIMESTAMP_NTZ
+            ELSE dbt_valid_from::TIMESTAMP_NTZ
+          END AS fecha_inicio_validez
+
         , dbt_valid_to::TIMESTAMP_NTZ AS fecha_fin_validez
+
         , CASE
             WHEN dbt_valid_to IS NULL
               AND COALESCE(dbt_is_deleted, FALSE) = FALSE
             THEN TRUE
             ELSE FALSE
           END::BOOLEAN AS es_version_actual
+
         , COALESCE(dbt_is_deleted, FALSE)::BOOLEAN AS es_eliminado
-    FROM snp_empleado
+    FROM snp_empleado_versioned
 ),
 
 -- Default Dimension Row para hechos sin empleado conocido

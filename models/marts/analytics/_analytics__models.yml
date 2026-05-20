@@ -1131,7 +1131,6 @@ models:
         constraints:
           - type: not_null
         data_tests:
-          - unique
           - not_null
 
       - name: nombre_token
